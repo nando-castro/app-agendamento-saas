@@ -1,7 +1,12 @@
 import { useEffect, useMemo, useState } from "react";
 import { api } from "../../lib/api";
-import { clearAdminToken } from "../../lib/storage";
 import type { BookingLink, Service } from "../../lib/types";
+
+import { Badge } from "@/components/ui/badge";
+import { Button } from "@/components/ui/button";
+import { Card, CardContent } from "@/components/ui/card";
+import { Switch } from "@/components/ui/switch";
+import { Copy, ExternalLink, Plus } from "lucide-react";
 
 export default function AdminDashboardPage() {
   const [services, setServices] = useState<Service[]>([]);
@@ -54,7 +59,7 @@ export default function AdminDashboardPage() {
       setCopiedId(linkId);
       window.setTimeout(() => {
         setCopiedId((current) => (current === linkId ? null : current));
-      }, 1500);
+      }, 1200);
     } catch {
       const ta = document.createElement("textarea");
       ta.value = text;
@@ -68,7 +73,7 @@ export default function AdminDashboardPage() {
       setCopiedId(linkId);
       window.setTimeout(() => {
         setCopiedId((current) => (current === linkId ? null : current));
-      }, 1500);
+      }, 1200);
     }
   }
 
@@ -77,178 +82,191 @@ export default function AdminDashboardPage() {
   }, []);
 
   return (
-    <div className="min-h-screen p-6">
-      <div className="max-w-5xl mx-auto space-y-6">
-        <div className="flex items-center justify-between">
-          <h1 className="text-2xl font-semibold">Admin</h1>
-          <button
-            className="rounded-xl border px-3 py-2"
-            onClick={() => {
-              clearAdminToken();
-              window.location.href = "/admin/login";
-            }}
-          >
-            Sair
-          </button>
-        </div>
+    <div className="w-full max-w-none space-y-6 overflow-x-hidden px-4 md:px-0">
+      {err && <div className="text-sm text-rose-600">{err}</div>}
 
-        {err && <div className="text-sm text-red-600">{err}</div>}
-        {loading ? (
-          <div className="text-sm text-zinc-600">Carregando...</div>
-        ) : (
-          <>
-            <section className="rounded-2xl bg-white shadow p-4">
-              <div className="flex items-center justify-between">
-                <h2 className="font-semibold">Links Públicos</h2>
-                <button
-                  className="rounded-xl bg-zinc-900 text-white px-3 py-2"
-                  onClick={() => void createLink()}
-                >
-                  Gerar link geral
-                </button>
+      {loading ? (
+        <div className="text-sm text-muted-foreground">Carregando...</div>
+      ) : (
+        <>
+          {/* LINKS PÚBLICOS */}
+          <section className="w-full space-y-3">
+            <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+              <div className="min-w-0">
+                <h2 className="text-lg font-semibold">Links Públicos</h2>
+                <p className="text-sm text-muted-foreground">
+                  Gere links gerais ou por serviço e ative/desative quando quiser.
+                </p>
               </div>
 
-              <div className="mt-3 grid gap-2">
-                {links.map((l) => {
-                  const url = `${origin}/public/${l.token}`;
-                  const isActive = !!l.active;
-                  const isBusy = togglingId === l.id;
+              <Button
+                onClick={() => void createLink()}
+                className="rounded-full gap-2 w-full sm:w-auto"
+              >
+                <Plus className="h-4 w-4" />
+                Gerar link geral
+              </Button>
+            </div>
 
-                  return (
-                    <div
-                      key={l.id}
-                      className="flex items-center justify-between gap-3 rounded-xl border p-3"
-                    >
-                      <div className="text-sm min-w-0">
-                        <div className="font-medium">
-                          Token: <span className="font-mono">{l.token}</span>
+            <div className="grid w-full gap-3">
+              {links.map((l) => {
+                const url = `${origin}/public/${l.token}`;
+                const isActive = !!l.active;
+                const isBusy = togglingId === l.id;
+
+                const scopeLabel = l.service ? `Restrito: ${l.service.name}` : "Geral";
+
+                return (
+                  <Card key={l.id} className="w-full rounded-2xl">
+                    <CardContent className="p-4 space-y-3">
+                      {/* Top row: token + switch */}
+                      <div className="flex items-start justify-between gap-4">
+                        <div className="min-w-0">
+                          <div className="text-[11px] uppercase tracking-widest text-muted-foreground">
+                            Token
+                          </div>
+                          <div className="mt-1 font-mono text-sm truncate">
+                            {l.token}
+                          </div>
+
+                          <div className="mt-2 flex flex-wrap items-center gap-2">
+                            <Badge variant="secondary" className="rounded-full">
+                              {scopeLabel}
+                            </Badge>
+
+                            <Badge
+                              variant="secondary"
+                              className={[
+                                "rounded-full",
+                                isActive
+                                  ? "bg-emerald-500/15 text-emerald-700"
+                                  : "bg-rose-500/15 text-rose-700",
+                              ].join(" ")}
+                            >
+                              {isActive ? "Ativo" : "Inativo"}
+                            </Badge>
+                          </div>
                         </div>
 
-                        <div className="text-zinc-600 flex items-center gap-2">
-                          <span>
-                            {l.service ? `Serviço: ${l.service.name}` : "Geral"}{" "}
-                            •
-                          </span>
+                        <div className="flex items-center gap-2 shrink-0">
+                          <Switch
+                            checked={isActive}
+                            disabled={isBusy}
+                            onCheckedChange={() => void toggleLink(l.id)}
+                            aria-label={isActive ? "Desativar link" : "Ativar link"}
+                          />
+                        </div>
+                      </div>
 
-                          <span
-                            className={
-                              isActive
-                                ? "font-medium text-emerald-700"
-                                : "font-medium text-rose-700"
-                            }
+                      {/* URL row */}
+                      <div className="flex w-full items-center gap-2 rounded-2xl border bg-muted/30 px-3 py-2">
+                        <div className="min-w-0 flex-1">
+                          <div className="text-[11px] uppercase tracking-widest text-muted-foreground">
+                            URL
+                          </div>
+
+                          {/* no mobile: quebra segura; no desktop: truncado */}
+                          <div
+                            className="font-mono text-xs break-all sm:truncate"
+                            title={url}
                           >
-                            {isActive ? "Ativo" : "Inativo"}
-                          </span>
-                        </div>
-
-                        <div className="text-zinc-600 flex items-center gap-2 min-w-0">
-                          <span>URL:</span>
-
-                          <span className="font-mono truncate" title={url}>
                             {url}
-                          </span>
+                          </div>
+                        </div>
 
-                          <button
-                            type="button"
-                            className="rounded-lg border px-2 py-1 text-xs"
-                            onClick={() => void copyToClipboard(url, l.id)}
-                            aria-label="Copiar link"
-                            title="Copiar link"
-                          >
-                            {copiedId === l.id ? "Copiado!" : "Copiar"}
-                          </button>
+                        <Button
+                          variant="outline"
+                          size="icon"
+                          className="rounded-xl shrink-0"
+                          onClick={() => void copyToClipboard(url, l.id)}
+                          title="Copiar"
+                          aria-label="Copiar"
+                        >
+                          <Copy className="h-4 w-4" />
+                        </Button>
 
+                        <Button
+                          asChild
+                          variant="outline"
+                          size="icon"
+                          className="rounded-xl shrink-0"
+                        >
                           <a
-                            className="rounded-lg border px-2 py-1 text-xs"
                             href={url}
                             target="_blank"
                             rel="noopener noreferrer"
-                            aria-label="Abrir em nova guia"
-                            title="Abrir em nova guia"
+                            title="Abrir"
+                            aria-label="Abrir"
                           >
-                            Abrir
+                            <ExternalLink className="h-4 w-4" />
                           </a>
-                        </div>
+                        </Button>
                       </div>
 
-                      <button
-                        disabled={isBusy}
-                        className={[
-                          "shrink-0 rounded-xl px-3 py-2 font-medium disabled:opacity-60 disabled:cursor-not-allowed",
-                          isActive
-                            ? "bg-rose-600 text-white hover:bg-rose-700"
-                            : "bg-emerald-600 text-white hover:bg-emerald-700",
-                        ].join(" ")}
-                        onClick={() => void toggleLink(l.id)}
-                        title={isActive ? "Desativar link" : "Ativar link"}
-                        aria-label={isActive ? "Desativar link" : "Ativar link"}
-                      >
-                        {isBusy
-                          ? "Alterando..."
-                          : isActive
-                            ? "Desativar"
-                            : "Ativar"}
-                      </button>
-                    </div>
-                  );
-                })}
+                      {copiedId === l.id && (
+                        <div className="text-xs text-emerald-600">Copiado!</div>
+                      )}
+                    </CardContent>
+                  </Card>
+                );
+              })}
 
-                {links.length === 0 && (
-                  <div className="text-sm text-zinc-600">
-                    Nenhum link ainda.
-                  </div>
-                )}
-              </div>
-            </section>
+              {links.length === 0 && (
+                <div className="text-sm text-muted-foreground">Nenhum link ainda.</div>
+              )}
+            </div>
+          </section>
 
-            <section className="rounded-2xl bg-white shadow p-4">
-              <h2 className="font-semibold">Serviços</h2>
-              <div className="mt-3 grid gap-2">
-                {services.map((s) => (
-                  <div
-                    key={s.id}
-                    className="flex items-center justify-between rounded-xl border p-3"
-                  >
-                    <div className="text-sm">
-                      <div className="font-medium">{s.name}</div>
-                      <div className="text-zinc-600">
-                        {s.durationMinutes}min • R${" "}
-                        {(s.priceCents / 100).toFixed(2)}
+          {/* SERVIÇOS */}
+          <section className="w-full space-y-3">
+            <div className="flex items-end justify-between">
+              <h2 className="text-lg font-semibold">Serviços</h2>
+            </div>
+
+            <div className="grid w-full gap-3">
+              {services.map((s) => (
+                <Card key={s.id} className="w-full rounded-2xl">
+                  <CardContent className="p-4 flex items-start justify-between gap-4">
+                    <div className="min-w-0">
+                      <div className="font-medium truncate">{s.name}</div>
+                      <div className="text-sm text-muted-foreground">
+                        {s.durationMinutes}min • R$ {(s.priceCents / 100).toFixed(2)}
                       </div>
 
-                      <div className="flex items-center gap-2 text-zinc-600">
-                        <span>Status:</span>
-                        <span
-                          className={
+                      <div className="mt-2 flex items-center gap-2">
+                        <Badge
+                          variant="secondary"
+                          className={[
+                            "rounded-full",
                             s.active
-                              ? "font-medium text-emerald-700"
-                              : "font-medium text-rose-700"
-                          }
+                              ? "bg-emerald-500/15 text-emerald-700"
+                              : "bg-rose-500/15 text-rose-700",
+                          ].join(" ")}
                         >
                           {s.active ? "Ativo" : "Inativo"}
-                        </span>
+                        </Badge>
                       </div>
                     </div>
 
-                    <button
-                      className="rounded-xl bg-zinc-900 text-white px-3 py-2"
+                    <Button
+                      className="rounded-full shrink-0"
                       onClick={() => void createLink(s.id)}
                     >
-                      Gerar link deste serviço
-                    </button>
-                  </div>
-                ))}
+                      Gerar link
+                    </Button>
+                  </CardContent>
+                </Card>
+              ))}
 
-                {services.length === 0 && (
-                  <div className="text-sm text-zinc-600">
-                    Crie serviços no backend primeiro.
-                  </div>
-                )}
-              </div>
-            </section>
-          </>
-        )}
-      </div>
+              {services.length === 0 && (
+                <div className="text-sm text-muted-foreground">
+                  Crie serviços no backend primeiro.
+                </div>
+              )}
+            </div>
+          </section>
+        </>
+      )}
     </div>
   );
 }
