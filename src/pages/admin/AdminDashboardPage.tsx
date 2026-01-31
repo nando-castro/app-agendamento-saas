@@ -1,7 +1,7 @@
-import { useEffect, useMemo, useState } from 'react';
-import { api } from '../../lib/api';
-import { clearAdminToken } from '../../lib/storage';
-import type { BookingLink, Service } from '../../lib/types';
+import { useEffect, useMemo, useState } from "react";
+import { api } from "../../lib/api";
+import { clearAdminToken } from "../../lib/storage";
+import type { BookingLink, Service } from "../../lib/types";
 
 export default function AdminDashboardPage() {
   const [services, setServices] = useState<Service[]>([]);
@@ -9,10 +9,10 @@ export default function AdminDashboardPage() {
   const [loading, setLoading] = useState(true);
   const [err, setErr] = useState<string | null>(null);
   const [copiedId, setCopiedId] = useState<string | null>(null);
+  const [togglingId, setTogglingId] = useState<string | null>(null);
 
   const origin = useMemo(() => {
-    // evita crash se algum dia isso rodar em SSR
-    if (typeof window === 'undefined') return '';
+    if (typeof window === "undefined") return "";
     return window.location.origin;
   }, []);
 
@@ -21,26 +21,31 @@ export default function AdminDashboardPage() {
     setLoading(true);
     try {
       const [s, l] = await Promise.all([
-        api.get<Service[]>('/services'),
-        api.get<BookingLink[]>('/booking-links'),
+        api.get<Service[]>("/services"),
+        api.get<BookingLink[]>("/booking-links"),
       ]);
       setServices(s.data);
       setLinks(l.data);
     } catch (e: any) {
-      setErr(e?.response?.data?.message ?? 'Falha ao carregar.');
+      setErr(e?.response?.data?.message ?? "Falha ao carregar.");
     } finally {
       setLoading(false);
     }
   }
 
   async function createLink(serviceId?: string) {
-    await api.post('/booking-links', serviceId ? { serviceId } : {});
+    await api.post("/booking-links", serviceId ? { serviceId } : {});
     await load();
   }
 
   async function toggleLink(id: string) {
-    await api.patch(`/booking-links/${id}/toggle`);
-    await load();
+    setTogglingId(id);
+    try {
+      await api.patch(`/booking-links/${id}/toggle`);
+      await load();
+    } finally {
+      setTogglingId((cur) => (cur === id ? null : cur));
+    }
   }
 
   async function copyToClipboard(text: string, linkId: string) {
@@ -51,14 +56,13 @@ export default function AdminDashboardPage() {
         setCopiedId((current) => (current === linkId ? null : current));
       }, 1500);
     } catch {
-      // fallback: seleciona e copia (menos elegante, mas funciona em alguns casos)
-      const ta = document.createElement('textarea');
+      const ta = document.createElement("textarea");
       ta.value = text;
-      ta.style.position = 'fixed';
-      ta.style.left = '-9999px';
+      ta.style.position = "fixed";
+      ta.style.left = "-9999px";
       document.body.appendChild(ta);
       ta.select();
-      document.execCommand('copy');
+      document.execCommand("copy");
       document.body.removeChild(ta);
 
       setCopiedId(linkId);
@@ -81,7 +85,7 @@ export default function AdminDashboardPage() {
             className="rounded-xl border px-3 py-2"
             onClick={() => {
               clearAdminToken();
-              window.location.href = '/admin/login';
+              window.location.href = "/admin/login";
             }}
           >
             Sair
@@ -107,6 +111,8 @@ export default function AdminDashboardPage() {
               <div className="mt-3 grid gap-2">
                 {links.map((l) => {
                   const url = `${origin}/public/${l.token}`;
+                  const isActive = !!l.active;
+                  const isBusy = togglingId === l.id;
 
                   return (
                     <div
@@ -118,19 +124,27 @@ export default function AdminDashboardPage() {
                           Token: <span className="font-mono">{l.token}</span>
                         </div>
 
-                        <div className="text-zinc-600">
-                          {l.service ? `Restrito: ${l.service.name}` : 'Geral'}
-                          {' • '}
-                          {l.active ? 'Ativo' : 'Inativo'}
+                        <div className="text-zinc-600 flex items-center gap-2">
+                          <span>
+                            {l.service ? `Serviço: ${l.service.name}` : "Geral"}{" "}
+                            •
+                          </span>
+
+                          <span
+                            className={
+                              isActive
+                                ? "font-medium text-emerald-700"
+                                : "font-medium text-rose-700"
+                            }
+                          >
+                            {isActive ? "Ativo" : "Inativo"}
+                          </span>
                         </div>
 
                         <div className="text-zinc-600 flex items-center gap-2 min-w-0">
                           <span>URL:</span>
 
-                          <span
-                            className="font-mono truncate"
-                            title={url}
-                          >
+                          <span className="font-mono truncate" title={url}>
                             {url}
                           </span>
 
@@ -141,7 +155,7 @@ export default function AdminDashboardPage() {
                             aria-label="Copiar link"
                             title="Copiar link"
                           >
-                            {copiedId === l.id ? 'Copiado!' : 'Copiar'}
+                            {copiedId === l.id ? "Copiado!" : "Copiar"}
                           </button>
 
                           <a
@@ -158,17 +172,31 @@ export default function AdminDashboardPage() {
                       </div>
 
                       <button
-                        className="shrink-0 rounded-xl border px-3 py-2"
+                        disabled={isBusy}
+                        className={[
+                          "shrink-0 rounded-xl px-3 py-2 font-medium disabled:opacity-60 disabled:cursor-not-allowed",
+                          isActive
+                            ? "bg-rose-600 text-white hover:bg-rose-700"
+                            : "bg-emerald-600 text-white hover:bg-emerald-700",
+                        ].join(" ")}
                         onClick={() => void toggleLink(l.id)}
+                        title={isActive ? "Desativar link" : "Ativar link"}
+                        aria-label={isActive ? "Desativar link" : "Ativar link"}
                       >
-                        Toggle
+                        {isBusy
+                          ? "Alterando..."
+                          : isActive
+                            ? "Desativar"
+                            : "Ativar"}
                       </button>
                     </div>
                   );
                 })}
 
                 {links.length === 0 && (
-                  <div className="text-sm text-zinc-600">Nenhum link ainda.</div>
+                  <div className="text-sm text-zinc-600">
+                    Nenhum link ainda.
+                  </div>
                 )}
               </div>
             </section>
@@ -184,9 +212,22 @@ export default function AdminDashboardPage() {
                     <div className="text-sm">
                       <div className="font-medium">{s.name}</div>
                       <div className="text-zinc-600">
-                        {s.durationMinutes}min • R$ {(s.priceCents / 100).toFixed(2)}
+                        {s.durationMinutes}min • R${" "}
+                        {(s.priceCents / 100).toFixed(2)}
                       </div>
-                      <div className="text-zinc-600">{s.active ? 'Ativo' : 'Inativo'}</div>
+
+                      <div className="flex items-center gap-2 text-zinc-600">
+                        <span>Status:</span>
+                        <span
+                          className={
+                            s.active
+                              ? "font-medium text-emerald-700"
+                              : "font-medium text-rose-700"
+                          }
+                        >
+                          {s.active ? "Ativo" : "Inativo"}
+                        </span>
+                      </div>
                     </div>
 
                     <button
