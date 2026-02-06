@@ -3,6 +3,7 @@ import { getErrorMessage } from "@/lib/getErrorMessage";
 import { useEffect, useMemo, useState } from "react";
 import { useNavigate } from "react-router-dom";
 
+import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import {
@@ -17,7 +18,7 @@ import { Label } from "@/components/ui/label";
 import { Separator } from "@/components/ui/separator";
 import { Switch } from "@/components/ui/switch";
 
-import { ArrowLeft, CalendarX2, Plus, Trash2 } from "lucide-react";
+import { ArrowLeft, CalendarX2, Pencil, Plus, Trash2 } from "lucide-react";
 
 type BusinessHourItem = {
   weekday: number; // 0..6
@@ -43,18 +44,6 @@ const weekdayLabel = [
   "Sábado",
 ];
 
-// function toLocalDateTimeInputValue(iso: string) {
-//   // ISO -> "YYYY-MM-DDTHH:mm" (sem segundos) para input datetime-local
-//   const d = new Date(iso);
-//   const pad2 = (n: number) => String(n).padStart(2, "0");
-//   const yyyy = d.getFullYear();
-//   const mm = pad2(d.getMonth() + 1);
-//   const dd = pad2(d.getDate());
-//   const hh = pad2(d.getHours());
-//   const mi = pad2(d.getMinutes());
-//   return `${yyyy}-${mm}-${dd}T${hh}:${mi}`;
-// }
-
 function fmtBlockRange(b: Block) {
   const start = new Date(b.startAt);
   const end = new Date(b.endAt);
@@ -67,12 +56,18 @@ function fmtBlockRange(b: Block) {
   })}`;
 }
 
+function fmtBusinessHourView(h: BusinessHourItem) {
+  if (!h.active) return "Fechado";
+  return `${h.startTime} às ${h.endTime}`;
+}
+
 export default function AdminSchedulePage() {
   const nav = useNavigate();
 
   const [err, setErr] = useState<string | null>(null);
 
   const [hours, setHours] = useState<BusinessHourItem[]>([]);
+  const [hoursConfigured, setHoursConfigured] = useState(false); // ✅ primeira vez
   const [blocks, setBlocks] = useState<Block[]>([]);
   const [loading, setLoading] = useState(true);
 
@@ -87,20 +82,27 @@ export default function AdminSchedulePage() {
     };
   });
 
-  const [open, setOpen] = useState(false);
+  // -------- modal EXPEDIENTE --------
+  const [hoursOpen, setHoursOpen] = useState(false);
+  const [hoursDraft, setHoursDraft] = useState<BusinessHourItem[]>([]);
+  const [savingHours, setSavingHours] = useState(false);
+
+  // -------- modal BLOQUEIO --------
+  const [openBlock, setOpenBlock] = useState(false);
   const [blockForm, setBlockForm] = useState({
     startAt: "", // datetime-local
     endAt: "", // datetime-local
     reason: "",
   });
 
+  // ✅ padrão: tudo DESATIVADO
   const defaultHours = useMemo<BusinessHourItem[]>(
     () =>
       Array.from({ length: 7 }).map((_, i) => ({
         weekday: i,
-        startTime: i === 0 ? "09:00" : "09:00",
+        startTime: "09:00",
         endTime: "18:00",
-        active: i >= 1 && i <= 5, // seg-sex
+        active: false,
       })),
     [],
   );
@@ -116,7 +118,11 @@ export default function AdminSchedulePage() {
         }),
       ]);
 
-      setHours(h.data.length ? h.data : defaultHours);
+      const configured = (h.data ?? []).length > 0;
+      setHoursConfigured(configured);
+
+      // ✅ se vier vazio, mostra o default (tudo fechado)
+      setHours(configured ? h.data : defaultHours);
       setBlocks(b.data);
     } catch (e: unknown) {
       setErr(getErrorMessage(e));
@@ -130,13 +136,23 @@ export default function AdminSchedulePage() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  async function saveHours() {
+  function openHoursEditor() {
     setErr(null);
+    setHoursDraft(hours.map((x) => ({ ...x })));
+    setHoursOpen(true);
+  }
+
+  async function saveHoursFromModal() {
+    setErr(null);
+    setSavingHours(true);
     try {
-      await api.put("/schedule/business-hours", { items: hours });
+      await api.put("/schedule/business-hours", { items: hoursDraft });
+      setHoursOpen(false);
       await loadAll();
     } catch (e: unknown) {
       setErr(getErrorMessage(e));
+    } finally {
+      setSavingHours(false);
     }
   }
 
@@ -147,7 +163,6 @@ export default function AdminSchedulePage() {
         throw new Error("Informe início e fim.");
       }
 
-      // datetime-local vem sem timezone; criamos Date local e enviamos ISO
       const startIso = new Date(blockForm.startAt).toISOString();
       const endIso = new Date(blockForm.endAt).toISOString();
 
@@ -157,7 +172,7 @@ export default function AdminSchedulePage() {
         reason: blockForm.reason.trim() === "" ? undefined : blockForm.reason,
       });
 
-      setOpen(false);
+      setOpenBlock(false);
       setBlockForm({ startAt: "", endAt: "", reason: "" });
       await loadAll();
     } catch (e: unknown) {
@@ -177,7 +192,7 @@ export default function AdminSchedulePage() {
 
   return (
     <div className="w-full space-y-4">
-      {/* TOP BAR (mobile style) */}
+      {/* TOP BAR */}
       <div className="sticky top-0 z-30 -mx-4 px-4 py-3 border-b bg-background/95 backdrop-blur md:static md:mx-0 md:px-0 md:border-0">
         <div className="flex items-center justify-between gap-3">
           <Button
@@ -197,12 +212,9 @@ export default function AdminSchedulePage() {
             </div>
           </div>
 
-          <Button
-            size="sm"
-            className="rounded-full"
-            onClick={() => void saveHours()}
-          >
-            Salvar
+          {/* ✅ primeira vez: Configurar | depois: Editar */}
+          <Button size="sm" className="rounded-full" onClick={openHoursEditor}>
+            {hoursConfigured ? "Editar" : "Configurar"}
           </Button>
         </div>
       </div>
@@ -215,81 +227,94 @@ export default function AdminSchedulePage() {
         </Card>
       )}
 
-      {/* EXPEDIENTE */}
+      {/* EXPEDIENTE (somente visualização) */}
       <section className="space-y-2">
-        <div>
-          <h2 className="text-base font-semibold">Expediente</h2>
-          <p className="text-sm text-muted-foreground">
-            Configure seus dias de atendimento
-          </p>
+        <div className="flex items-center justify-between gap-3">
+          <div>
+            <h2 className="text-base font-semibold">Expediente</h2>
+            <p className="text-sm text-muted-foreground">
+              {hoursConfigured
+                ? "Visualize seus dias de atendimento"
+                : "Você ainda não configurou seu expediente"}
+            </p>
+          </div>
+
+          {/* ✅ somente “editar” quando já existir horários */}
+          {hoursConfigured ? (
+            <Button
+              variant="outline"
+              className="rounded-xl gap-2"
+              onClick={openHoursEditor}
+            >
+              <Pencil className="h-4 w-4" />
+              Editar expediente
+            </Button>
+          ) : (
+            <Button className="rounded-xl gap-2" onClick={openHoursEditor}>
+              <Pencil className="h-4 w-4" />
+              Configurar horários
+            </Button>
+          )}
         </div>
 
+        {/* ✅ mensagem de primeira vez */}
+        {!loading && !hoursConfigured && (
+          <Card className="rounded-2xl border-amber-500/30 bg-amber-500/5">
+            <CardContent className="p-4 flex items-center justify-between gap-3">
+              <div className="text-sm">
+                <div className="font-medium">Nenhum horário cadastrado</div>
+                <div className="text-xs text-muted-foreground">
+                  Configure pelo menos um dia e horário para liberar agendamentos.
+                </div>
+              </div>
+
+              <Button className="rounded-xl" onClick={openHoursEditor}>
+                Configurar
+              </Button>
+            </CardContent>
+          </Card>
+        )}
+
+        {/* visualização (tudo fechado na primeira vez) */}
         <div className="space-y-3">
-          {hours.map((h, idx) => (
+          {hours.map((h) => (
             <Card key={h.weekday} className="rounded-2xl">
-              <CardContent className="p-4 space-y-3">
-                {/* header do dia */}
-                <div className="flex items-center justify-between">
+              <CardContent className="p-4 space-y-2">
+                <div className="flex items-center justify-between gap-3">
                   <div className="font-medium">{weekdayLabel[h.weekday]}</div>
 
-                  <Switch
-                    checked={h.active}
-                    onCheckedChange={(active) =>
-                      setHours((p) =>
-                        p.map((x, i) => (i === idx ? { ...x, active } : x)),
-                      )
+                  <Badge
+                    variant="secondary"
+                    className={[
+                      "rounded-full",
+                      h.active
+                        ? "bg-emerald-500/15 text-emerald-700"
+                        : "bg-zinc-500/15 text-zinc-700",
+                    ].join(" ")}
+                  >
+                    {h.active ? "Ativo" : "Desativado"}
+                  </Badge>
+                </div>
+
+                <div className="text-sm">
+                  <span className="text-muted-foreground">Horário: </span>
+                  <span
+                    className={
+                      h.active ? "font-medium" : "text-muted-foreground"
                     }
-                    aria-label={`Ativar ${weekdayLabel[h.weekday]}`}
-                  />
+                  >
+                    {fmtBusinessHourView(h)}
+                  </span>
                 </div>
 
-                <div className="grid grid-cols-2 gap-3">
-                  <div className="grid gap-1.5">
-                    <Label className="text-[11px] uppercase tracking-widest text-muted-foreground">
-                      Início
-                    </Label>
-                    <Input
-                      value={h.startTime}
-                      disabled={!h.active}
-                      onChange={(e) =>
-                        setHours((p) =>
-                          p.map((x, i) =>
-                            i === idx ? { ...x, startTime: e.target.value } : x,
-                          ),
-                        )
-                      }
-                      placeholder="09:00"
-                      inputMode="numeric"
-                    />
+                {h.active && (
+                  <div className="text-[11px] text-muted-foreground">
+                    Início {h.startTime} • Fim {h.endTime}
                   </div>
-
-                  <div className="grid gap-1.5">
-                    <Label className="text-[11px] uppercase tracking-widest text-muted-foreground">
-                      Fim
-                    </Label>
-                    <Input
-                      value={h.endTime}
-                      disabled={!h.active}
-                      onChange={(e) =>
-                        setHours((p) =>
-                          p.map((x, i) =>
-                            i === idx ? { ...x, endTime: e.target.value } : x,
-                          ),
-                        )
-                      }
-                      placeholder="18:00"
-                      inputMode="numeric"
-                    />
-                  </div>
-                </div>
+                )}
               </CardContent>
             </Card>
           ))}
-        </div>
-
-        {/* no desktop ainda pode ter esse botão (no mobile salvamos pelo topbar) */}
-        <div className="hidden md:block">
-          <Button onClick={() => void saveHours()}>Salvar horários</Button>
         </div>
       </section>
 
@@ -306,7 +331,7 @@ export default function AdminSchedulePage() {
           <Button
             size="icon"
             className="rounded-full"
-            onClick={() => setOpen(true)}
+            onClick={() => setOpenBlock(true)}
             aria-label="Novo bloqueio"
             title="Novo bloqueio"
           >
@@ -314,7 +339,6 @@ export default function AdminSchedulePage() {
           </Button>
         </div>
 
-        {/* range */}
         <Card className="rounded-2xl">
           <CardContent className="p-4 space-y-3">
             <div className="grid gap-3 sm:grid-cols-2">
@@ -392,11 +416,104 @@ export default function AdminSchedulePage() {
         </Card>
       </section>
 
-      {/* MODAL NOVO BLOQUEIO (datetime-local) */}
+      {/* MODAL: CONFIGURAR/EDITAR EXPEDIENTE */}
       <Dialog
-        open={open}
+        open={hoursOpen}
         onOpenChange={(v) => {
-          setOpen(v);
+          setHoursOpen(v);
+          if (!v) setErr(null);
+        }}
+      >
+        <DialogContent className="sm:max-w-lg">
+          <DialogHeader>
+            <DialogTitle>
+              {hoursConfigured ? "Editar expediente" : "Configurar expediente"}
+            </DialogTitle>
+          </DialogHeader>
+
+          <div className="space-y-3 max-h-[65vh] overflow-auto pr-1">
+            {hoursDraft.map((h, idx) => (
+              <Card key={h.weekday} className="rounded-2xl">
+                <CardContent className="p-4 space-y-3">
+                  <div className="flex items-center justify-between">
+                    <div className="font-medium">{weekdayLabel[h.weekday]}</div>
+
+                    <Switch
+                      checked={h.active}
+                      onCheckedChange={(active) =>
+                        setHoursDraft((p) =>
+                          p.map((x, i) => (i === idx ? { ...x, active } : x)),
+                        )
+                      }
+                      aria-label={`Ativar ${weekdayLabel[h.weekday]}`}
+                    />
+                  </div>
+
+                  <div className="grid grid-cols-2 gap-3">
+                    <div className="grid gap-1.5">
+                      <Label className="text-[11px] uppercase tracking-widest text-muted-foreground">
+                        Início
+                      </Label>
+                      <Input
+                        value={h.startTime}
+                        disabled={!h.active}
+                        onChange={(e) =>
+                          setHoursDraft((p) =>
+                            p.map((x, i) =>
+                              i === idx
+                                ? { ...x, startTime: e.target.value }
+                                : x,
+                            ),
+                          )
+                        }
+                        placeholder="09:00"
+                        inputMode="numeric"
+                      />
+                    </div>
+
+                    <div className="grid gap-1.5">
+                      <Label className="text-[11px] uppercase tracking-widest text-muted-foreground">
+                        Fim
+                      </Label>
+                      <Input
+                        value={h.endTime}
+                        disabled={!h.active}
+                        onChange={(e) =>
+                          setHoursDraft((p) =>
+                            p.map((x, i) =>
+                              i === idx ? { ...x, endTime: e.target.value } : x,
+                            ),
+                          )
+                        }
+                        placeholder="18:00"
+                        inputMode="numeric"
+                      />
+                    </div>
+                  </div>
+                </CardContent>
+              </Card>
+            ))}
+          </div>
+
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setHoursOpen(false)}>
+              Cancelar
+            </Button>
+            <Button
+              onClick={() => void saveHoursFromModal()}
+              disabled={savingHours}
+            >
+              {savingHours ? "Salvando..." : "Salvar"}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* MODAL NOVO BLOQUEIO */}
+      <Dialog
+        open={openBlock}
+        onOpenChange={(v) => {
+          setOpenBlock(v);
           if (!v) setErr(null);
         }}
       >
@@ -441,7 +558,7 @@ export default function AdminSchedulePage() {
           </div>
 
           <DialogFooter>
-            <Button variant="outline" onClick={() => setOpen(false)}>
+            <Button variant="outline" onClick={() => setOpenBlock(false)}>
               Cancelar
             </Button>
             <Button onClick={() => void createBlock()}>Criar</Button>
