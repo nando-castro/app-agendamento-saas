@@ -1,5 +1,6 @@
+import { useLoading } from "@/lib/loading";
 import { useState } from "react";
-import { useNavigate } from "react-router-dom";
+import { Link, useLocation, useNavigate } from "react-router-dom";
 import { api } from "../../lib/api";
 import { setAdminToken } from "../../lib/storage";
 
@@ -59,25 +60,43 @@ function EyeOffIcon(props: React.SVGProps<SVGSVGElement>) {
   );
 }
 
+type LocationState = { from?: string };
+
 export default function AdminLoginPage() {
   const nav = useNavigate();
+  const location = useLocation();
+  const { show, hide } = useLoading(); // <-- 2) USA O HOOK
+
+  const from =
+    (location.state as LocationState | null)?.from &&
+    typeof (location.state as any).from === "string"
+      ? (location.state as LocationState).from!
+      : "/admin";
+
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [showPassword, setShowPassword] = useState(false);
   const [err, setErr] = useState<string | null>(null);
+
+  // opcional: mantém só pra travar botão
   const [loading, setLoading] = useState(false);
 
   async function onSubmit(e: React.FormEvent) {
     e.preventDefault();
     setErr(null);
     setLoading(true);
+
+    show("Entrando..."); // <-- 3) LIGA O LOADER GLOBAL
+
     try {
       const { data } = await api.post("/auth/login", { email, password });
       setAdminToken(data.accessToken);
-      nav("/admin");
+
+      nav(from, { replace: true });
     } catch (e: any) {
       setErr(e?.response?.data?.message ?? "Falha no login.");
     } finally {
+      hide();            // <-- 4) DESLIGA O LOADER GLOBAL
       setLoading(false);
     }
   }
@@ -135,9 +154,9 @@ export default function AdminLoginPage() {
 
           <div className="text-sm text-zinc-600">
             Não tem conta?{" "}
-            <a className="underline" href="/admin/register">
+            <Link className="underline" to="/admin/register">
               Registrar
-            </a>
+            </Link>
           </div>
         </form>
       </div>

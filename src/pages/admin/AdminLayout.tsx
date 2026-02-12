@@ -1,5 +1,6 @@
 import { Button } from "@/components/ui/button";
 import { Separator } from "@/components/ui/separator";
+import { useLoading } from "@/lib/loading";
 import { clearAdminToken } from "@/lib/storage";
 import {
   CalendarDays,
@@ -51,7 +52,9 @@ function BottomItem({
       className={({ isActive }) =>
         [
           "flex flex-1 flex-col items-center justify-center gap-1 py-2 text-xs transition-colors",
-          isActive ? "text-primary" : "text-muted-foreground hover:text-foreground",
+          isActive
+            ? "text-primary"
+            : "text-muted-foreground hover:text-foreground",
         ].join(" ")
       }
       end
@@ -65,10 +68,16 @@ function BottomItem({
 export default function AdminLayout() {
   const nav = useNavigate();
   const location = useLocation();
+  const { show, hide } = useLoading();
 
   function logout() {
-    clearAdminToken();
-    nav("/admin/login", { replace: true });
+    show("Saindo...");
+    try {
+      clearAdminToken();
+      nav("/admin/login", { replace: true });
+    } finally {
+      hide();
+    }
   }
 
   const sectionLabel =

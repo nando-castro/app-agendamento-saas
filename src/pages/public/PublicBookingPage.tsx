@@ -1,3 +1,4 @@
+import { useLoading } from "@/lib/loading";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { useParams } from "react-router-dom";
 import { publicApi } from "../../lib/api";
@@ -31,6 +32,7 @@ function msToMMSS(ms: number) {
 
 export default function PublicBookingPage() {
   const { token } = useParams<{ token: string }>();
+  const { show, hide } = useLoading();
 
   const [services, setServices] = useState<Service[]>([]);
   const [serviceId, setServiceId] = useState<string>("");
@@ -67,6 +69,8 @@ export default function PublicBookingPage() {
     if (!token) return;
     setErr(null);
     setLoading(true);
+    show("Carregando serviços...");
+
     try {
       const { data } = await publicApi.get<Service[]>(`${base}/services`);
       setServices(data);
@@ -74,14 +78,19 @@ export default function PublicBookingPage() {
     } catch (e: any) {
       setErr(e?.response?.data?.message ?? "Falha ao carregar serviços.");
     } finally {
+      hide();
       setLoading(false);
     }
   }
 
-  async function loadAvailability(opts?: { resetFlow?: boolean }) {
+  async function loadAvailability(opts?: {
+    resetFlow?: boolean;
+    showLoader?: boolean;
+  }) {
     if (!token || !serviceId) return;
 
     const resetFlow = opts?.resetFlow ?? true;
+    const showLoader = opts?.showLoader ?? true;
 
     setErr(null);
 
@@ -92,6 +101,8 @@ export default function PublicBookingPage() {
       setPixErr(null);
       setSelectedStartAt("");
     }
+
+    if (showLoader) show("Carregando horários...");
 
     try {
       const { data } = await publicApi.get<AvailabilityResponse>(
@@ -105,6 +116,8 @@ export default function PublicBookingPage() {
       setErr(
         e?.response?.data?.message ?? "Falha ao carregar disponibilidade.",
       );
+    } finally {
+      if (showLoader) hide();
     }
   }
 
@@ -148,6 +161,8 @@ export default function PublicBookingPage() {
     setPix(null);
     setPixLoading(true);
 
+    show("Criando reserva e gerando PIX...");
+
     let bookingCreated: Booking | null = null;
 
     try {
@@ -188,6 +203,7 @@ export default function PublicBookingPage() {
       setCreated(null);
       setPix(null);
     } finally {
+      hide();
       setPixLoading(false);
     }
   }
@@ -195,12 +211,15 @@ export default function PublicBookingPage() {
   async function startPixFlow(booking: Booking, payerEmail?: string) {
     setPixErr(null);
     setPixLoading(true);
+    show("Gerando PIX...");
+
     try {
       const payment = await createPixPayment(booking.id, payerEmail);
       setPix(payment);
     } catch (e: any) {
       setPixErr(e?.response?.data?.message ?? "Falha ao gerar PIX.");
     } finally {
+      hide();
       setPixLoading(false);
     }
   }
@@ -223,7 +242,7 @@ export default function PublicBookingPage() {
   const expired = created?.status === "EXPIRED";
   const awaitingPayment = inPaymentFlow && !approved && !expired;
 
-  // Polling: mantém a tela atualizada até aprovar
+  // Polling: mantém a tela atualizada até aprovar (sem loading global)
   useEffect(() => {
     clearPollers();
     if (!created) return;
@@ -274,7 +293,7 @@ export default function PublicBookingPage() {
   }, [token]);
 
   useEffect(() => {
-    void loadAvailability({ resetFlow: true });
+    void loadAvailability({ resetFlow: true, showLoader: true });
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [serviceId, date]);
 
@@ -450,7 +469,7 @@ export default function PublicBookingPage() {
               </>
             )}
 
-            {/* TELA DE PAGAMENTO PIX (fica no lugar; só troca os blocos internos) */}
+            {/* TELA DE PAGAMENTO PIX */}
             {inPaymentFlow && created && (
               <section className="rounded-2xl bg-white shadow p-4 space-y-4">
                 <div className="flex items-start justify-between gap-4">
@@ -487,9 +506,7 @@ export default function PublicBookingPage() {
                       <div className="mt-1 text-xs text-zinc-600">
                         Expira em:{" "}
                         <span className="font-mono">
-                          {remainingMs == null
-                            ? "--:--"
-                            : msToMMSS(remainingMs)}
+                          {remainingMs == null ? "--:--" : msToMMSS(remainingMs)}
                         </span>
                       </div>
                     )}
@@ -503,9 +520,7 @@ export default function PublicBookingPage() {
                       {created.code}
                     </span>
                   </div>
-                  <div>
-                    Horário: {new Date(created.startAt).toLocaleString()}
-                  </div>
+                  <div>Horário: {new Date(created.startAt).toLocaleString()}</div>
                   <div className="mt-2 text-zinc-700">
                     {created.signalAmountCents > 0 ? (
                       <>
@@ -535,12 +550,11 @@ export default function PublicBookingPage() {
                   </div>
                 )}
 
-                {/* Se não gerou PIX ainda, mostra botão para tentar */}
                 {!pix && !pixLoading && awaitingPayment && (
                   <div className="space-y-2">
                     <div className="text-sm text-zinc-700">
-                      Precisamos gerar o PIX para você. Se o email estiver
-                      vazio, informe abaixo:
+                      Precisamos gerar o PIX para você. Se o email estiver vazio,
+                      informe abaixo:
                     </div>
 
                     <input
@@ -566,7 +580,6 @@ export default function PublicBookingPage() {
                   <div className="text-sm text-zinc-600">Gerando PIX...</div>
                 )}
 
-                {/* ✅ APROVADO: troca QR/PIX por "confirmado" + detalhes */}
                 {approved && (
                   <div className="grid gap-4 sm:grid-cols-2">
                     <div className="rounded-2xl border p-4 bg-white">
@@ -655,7 +668,6 @@ export default function PublicBookingPage() {
                   </div>
                 )}
 
-                {/* ✅ AGUARDANDO: mostra QR + copia/cola */}
                 {awaitingPayment && pix && (
                   <div className="grid gap-4 sm:grid-cols-2">
                     <div className="rounded-2xl border p-4 bg-white">

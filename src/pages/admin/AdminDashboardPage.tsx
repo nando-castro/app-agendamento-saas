@@ -9,6 +9,8 @@ import { Switch } from "@/components/ui/switch";
 import { Copy, ExternalLink, Plus } from "lucide-react";
 import { useNavigate } from "react-router-dom";
 
+import { useLoading } from "@/lib/loading"; // ✅ ADD
+
 const SCHEDULE_ROUTE = "/admin/schedule";
 
 // --------- horários ----------
@@ -37,11 +39,8 @@ function hasValidBusinessHours(items: BusinessHourItem[]) {
 
 // --------- links helpers ----------
 function isLinkExpired(l: BookingLink) {
-  // se não existir expiresAt, consideramos "não expira"
   const anyL = l as any;
-  const expiresAt: string | null | undefined =
-    anyL.expiresAt ?? anyL.expires_at ?? null;
-
+  const expiresAt: string | null | undefined = anyL.expiresAt ?? anyL.expires_at ?? null;
   if (!expiresAt) return false;
 
   const t = new Date(expiresAt).getTime();
@@ -68,10 +67,7 @@ function getValidGeneralLink(links: BookingLink[]): BookingLink | null {
   return candidates[0] ?? null;
 }
 
-function getValidLinkForService(
-  links: BookingLink[],
-  serviceId: string,
-): BookingLink | null {
+function getValidLinkForService(links: BookingLink[], serviceId: string): BookingLink | null {
   const candidates = (links ?? [])
     .filter((l) => {
       const anyL = l as any;
@@ -92,6 +88,7 @@ function getValidLinkForService(
 
 export default function AdminDashboardPage() {
   const nav = useNavigate();
+  const { show, hide } = useLoading(); // ✅ ADD
 
   const [services, setServices] = useState<Service[]>([]);
   const [links, setLinks] = useState<BookingLink[]>([]);
@@ -107,10 +104,7 @@ export default function AdminDashboardPage() {
     return window.location.origin;
   }, []);
 
-  const hasActiveServices = useMemo(
-    () => services.some((s) => !!s.active),
-    [services],
-  );
+  const hasActiveServices = useMemo(() => services.some((s) => !!s.active), [services]);
 
   const generalLink = useMemo(() => getValidGeneralLink(links), [links]);
 
@@ -122,9 +116,11 @@ export default function AdminDashboardPage() {
     return hoursReady && hasActiveServices && !!generalLink && !generalLink.active;
   }, [hoursReady, hasActiveServices, generalLink]);
 
-  async function load() {
+  async function load(label = "Carregando painel...") {
     setErr(null);
     setLoading(true);
+    show(label); // ✅ GLOBAL ON
+
     try {
       const [s, l, h] = await Promise.all([
         api.get<Service[]>("/services"),
@@ -140,12 +136,14 @@ export default function AdminDashboardPage() {
     } catch (e: any) {
       setErr(e?.response?.data?.message ?? "Falha ao carregar.");
     } finally {
+      hide(); // ✅ GLOBAL OFF
       setLoading(false);
     }
   }
 
   useEffect(() => {
     void load();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   async function toggleLink(id: string) {
@@ -154,7 +152,6 @@ export default function AdminDashboardPage() {
     const link = links.find((x) => x.id === id);
     const activating = link ? !link.active : false;
 
-    // ✅ se estiver tentando ATIVAR e não tem horários, bloqueia
     if (activating && !hoursReady) {
       setErr(
         "Não é possível ativar links sem um horário de funcionamento válido. Configure o expediente primeiro.",
@@ -162,7 +159,6 @@ export default function AdminDashboardPage() {
       return;
     }
 
-    // ✅ se for link geral e estiver tentando ATIVAR sem serviço ativo, bloqueia
     if (activating && link) {
       const anyL = link as any;
       const isGeneral = !anyL.service && !(anyL.serviceId ?? anyL.service_id);
@@ -173,10 +169,12 @@ export default function AdminDashboardPage() {
     }
 
     setTogglingId(id);
+    show("Atualizando link..."); // ✅ GLOBAL ON
     try {
       await api.patch(`/booking-links/${id}/toggle`);
-      await load();
+      await load("Atualizando dados...");
     } finally {
+      hide(); // ✅ GLOBAL OFF
       setTogglingId((cur) => (cur === id ? null : cur));
     }
   }
@@ -184,7 +182,6 @@ export default function AdminDashboardPage() {
   async function createLink(serviceId?: string) {
     setErr(null);
 
-    // ✅ trava geral se não tiver expediente válido
     if (!hoursReady) {
       setErr(
         "Você precisa configurar um horário de funcionamento válido para gerar links de agendamento.",
@@ -192,57 +189,56 @@ export default function AdminDashboardPage() {
       return;
     }
 
-    // ---------- LINK GERAL ----------
-    if (!serviceId) {
-      if (!hasActiveServices) {
-        setErr("Para gerar link geral, ative pelo menos 1 serviço.");
-        return;
-      }
-
-      // ✅ mesma regra: não cria outro se já existir 1 válido (não expirado)
-      const existingGeneral = getValidGeneralLink(links);
-      if (existingGeneral) {
-        if (existingGeneral.active) {
-          setErr(
-            "Já existe um link geral válido. Gerencie em “Links Públicos”.",
-          );
+    show(serviceId ? "Gerando link do serviço..." : "Gerando link geral..."); // ✅ GLOBAL ON
+    try {
+      // ---------- LINK GERAL ----------
+      if (!serviceId) {
+        if (!hasActiveServices) {
+          setErr("Para gerar link geral, ative pelo menos 1 serviço.");
           return;
         }
-        await toggleLink(existingGeneral.id); // reativa
+
+        const existingGeneral = getValidGeneralLink(links);
+        if (existingGeneral) {
+          if (existingGeneral.active) {
+            setErr("Já existe um link geral válido. Gerencie em “Links Públicos”.");
+            return;
+          }
+          await toggleLink(existingGeneral.id);
+          return;
+        }
+
+        await api.post("/booking-links", {});
+        await load("Atualizando links...");
         return;
       }
 
-      await api.post("/booking-links", {});
-      await load();
-      return;
-    }
-
-    // ---------- LINK POR SERVIÇO ----------
-    const svc = services.find((x) => x.id === serviceId);
-    if (!svc) {
-      setErr("Serviço não encontrado.");
-      return;
-    }
-    if (!svc.active) {
-      setErr("Para gerar link do serviço, ele precisa estar ATIVO.");
-      return;
-    }
-
-    // ✅ impede criar outro link se já existir 1 válido (não expirado)
-    const existing = getValidLinkForService(links, serviceId);
-    if (existing) {
-      if (existing.active) {
-        setErr(
-          "Esse serviço já possui um link válido. Gerencie em “Links Públicos”.",
-        );
+      // ---------- LINK POR SERVIÇO ----------
+      const svc = services.find((x) => x.id === serviceId);
+      if (!svc) {
+        setErr("Serviço não encontrado.");
         return;
       }
-      await toggleLink(existing.id); // reativa
-      return;
-    }
+      if (!svc.active) {
+        setErr("Para gerar link do serviço, ele precisa estar ATIVO.");
+        return;
+      }
 
-    await api.post("/booking-links", { serviceId });
-    await load();
+      const existing = getValidLinkForService(links, serviceId);
+      if (existing) {
+        if (existing.active) {
+          setErr("Esse serviço já possui um link válido. Gerencie em “Links Públicos”.");
+          return;
+        }
+        await toggleLink(existing.id);
+        return;
+      }
+
+      await api.post("/booking-links", { serviceId });
+      await load("Atualizando links...");
+    } finally {
+      hide(); // ✅ GLOBAL OFF
+    }
   }
 
   async function copyToClipboard(text: string, linkId: string) {
@@ -282,7 +278,6 @@ export default function AdminDashboardPage() {
         <div className="text-sm text-muted-foreground">Carregando...</div>
       ) : (
         <>
-          {/* ✅ ALERTA: sem horários válidos */}
           {!hoursReady && (
             <Card className="rounded-2xl border-amber-500/30 bg-amber-500/5">
               <CardContent className="p-4 flex items-center justify-between gap-3">
@@ -311,28 +306,24 @@ export default function AdminDashboardPage() {
               <div className="min-w-0">
                 <h2 className="text-lg font-semibold">Links Públicos</h2>
                 <p className="text-sm text-muted-foreground">
-                  Gere links gerais ou por serviço e ative/desative quando
-                  quiser.
+                  Gere links gerais ou por serviço e ative/desative quando quiser.
                 </p>
 
                 {!hasActiveServices && (
                   <p className="mt-1 text-xs text-amber-600">
-                    Para gerar/ativar link geral, é necessário ter ao menos 1
-                    serviço ativo.
+                    Para gerar/ativar link geral, é necessário ter ao menos 1 serviço ativo.
                   </p>
                 )}
 
                 {!hoursReady && (
                   <p className="mt-1 text-xs text-amber-600">
-                    Para gerar/ativar links, é necessário configurar um
-                    expediente válido.
+                    Para gerar/ativar links, é necessário configurar um expediente válido.
                   </p>
                 )}
 
                 {generalLink?.active && (
                   <p className="mt-1 text-xs text-muted-foreground">
-                    Link geral já existe (não expirado). Você pode desativar/ativar
-                    no card dele abaixo.
+                    Link geral já existe (não expirado). Você pode desativar/ativar no card dele abaixo.
                   </p>
                 )}
               </div>
@@ -346,24 +337,7 @@ export default function AdminDashboardPage() {
                   void createLink();
                 }}
                 disabled={
-                  generalLink
-                    ? !canReactivateGeneralLink // se já existe, só habilita se for reativar
-                    : !canCreateGeneralLink // se não existe, só habilita se puder criar
-                }
-                title={
-                  generalLink
-                    ? generalLink.active
-                      ? "Link geral já existe. Gerencie em “Links Públicos”."
-                      : !hoursReady
-                        ? "Configure horários para reativar"
-                        : !hasActiveServices
-                          ? "Ative pelo menos 1 serviço para reativar"
-                          : "Reativar link geral existente"
-                    : !hoursReady
-                      ? "Configure horários para liberar links"
-                      : !hasActiveServices
-                        ? "Ative pelo menos 1 serviço para gerar link geral"
-                        : "Gerar link geral"
+                  generalLink ? !canReactivateGeneralLink : !canCreateGeneralLink
                 }
                 className="rounded-full gap-2 w-full sm:w-auto"
                 variant={generalLink && !generalLink.active ? "default" : "secondary"}
@@ -379,11 +353,9 @@ export default function AdminDashboardPage() {
                 const isActive = !!l.active;
                 const isBusy = togglingId === l.id;
 
-                const scopeLabel = l.service
-                  ? `Restrito: ${l.service.name}`
-                  : "Geral";
+                const scopeLabel = l.service ? `Restrito: ${l.service.name}` : "Geral";
 
-                const disableActivate = !hoursReady && !isActive; // ✅ só bloqueia ativar
+                const disableActivate = !hoursReady && !isActive;
 
                 return (
                   <Card key={l.id} className="w-full rounded-2xl">
@@ -393,9 +365,7 @@ export default function AdminDashboardPage() {
                           <div className="text-[11px] uppercase tracking-widest text-muted-foreground">
                             Token
                           </div>
-                          <div className="mt-1 font-mono text-sm truncate">
-                            {l.token}
-                          </div>
+                          <div className="mt-1 font-mono text-sm truncate">{l.token}</div>
 
                           <div className="mt-2 flex flex-wrap items-center gap-2">
                             <Badge variant="secondary" className="rounded-full">
@@ -451,7 +421,6 @@ export default function AdminDashboardPage() {
                         </div>
                       </div>
 
-                      {/* ✅ oculta URL/ações se estiver inativo */}
                       {isActive ? (
                         <>
                           <div className="flex w-full items-center gap-2 rounded-2xl border bg-muted/30 px-3 py-2">
@@ -459,10 +428,7 @@ export default function AdminDashboardPage() {
                               <div className="text-[11px] uppercase tracking-widest text-muted-foreground">
                                 URL
                               </div>
-                              <div
-                                className="font-mono text-xs break-all sm:truncate"
-                                title={url}
-                              >
+                              <div className="font-mono text-xs break-all sm:truncate" title={url}>
                                 {url}
                               </div>
                             </div>
@@ -478,12 +444,7 @@ export default function AdminDashboardPage() {
                               <Copy className="h-4 w-4" />
                             </Button>
 
-                            <Button
-                              asChild
-                              variant="outline"
-                              size="icon"
-                              className="rounded-xl shrink-0"
-                            >
+                            <Button asChild variant="outline" size="icon" className="rounded-xl shrink-0">
                               <a
                                 href={url}
                                 target="_blank"
@@ -497,9 +458,7 @@ export default function AdminDashboardPage() {
                           </div>
 
                           {copiedId === l.id && (
-                            <div className="text-xs text-emerald-600">
-                              Copiado!
-                            </div>
+                            <div className="text-xs text-emerald-600">Copiado!</div>
                           )}
                         </>
                       ) : (
@@ -513,9 +472,7 @@ export default function AdminDashboardPage() {
               })}
 
               {links.length === 0 && (
-                <div className="text-sm text-muted-foreground">
-                  Nenhum link ainda.
-                </div>
+                <div className="text-sm text-muted-foreground">Nenhum link ainda.</div>
               )}
             </div>
           </section>
@@ -530,14 +487,9 @@ export default function AdminDashboardPage() {
               {services.map((s) => {
                 const existingLink = getValidLinkForService(links, s.id);
 
-                const canGenerateServiceLink =
-                  !!s.active && hoursReady && !existingLink;
-
+                const canGenerateServiceLink = !!s.active && hoursReady && !existingLink;
                 const canReactivateServiceLink =
-                  !!s.active &&
-                  hoursReady &&
-                  !!existingLink &&
-                  !existingLink.active;
+                  !!s.active && hoursReady && !!existingLink && !existingLink.active;
 
                 const btnLabel = existingLink
                   ? existingLink.active
@@ -551,8 +503,7 @@ export default function AdminDashboardPage() {
                       <div className="min-w-0">
                         <div className="font-medium truncate">{s.name}</div>
                         <div className="text-sm text-muted-foreground">
-                          {s.durationMinutes}min • R${" "}
-                          {(s.priceCents / 100).toFixed(2)}
+                          {s.durationMinutes}min • R$ {(s.priceCents / 100).toFixed(2)}
                         </div>
 
                         <div className="mt-2 flex items-center gap-2">
@@ -603,28 +554,9 @@ export default function AdminDashboardPage() {
                           void createLink(s.id);
                         }}
                         disabled={
-                          existingLink
-                            ? !canReactivateServiceLink
-                            : !canGenerateServiceLink
+                          existingLink ? !canReactivateServiceLink : !canGenerateServiceLink
                         }
-                        title={
-                          existingLink
-                            ? existingLink.active
-                              ? "Já existe link válido para esse serviço. Gerencie em Links Públicos."
-                              : !hoursReady
-                                ? "Configure horários para reativar"
-                                : "Reativar link existente"
-                            : !hoursReady
-                              ? "Configure horários para liberar links"
-                              : !s.active
-                                ? "Ative o serviço para gerar link"
-                                : "Gerar link do serviço"
-                        }
-                        variant={
-                          existingLink && !existingLink.active
-                            ? "default"
-                            : "secondary"
-                        }
+                        variant={existingLink && !existingLink.active ? "default" : "secondary"}
                       >
                         {btnLabel}
                       </Button>

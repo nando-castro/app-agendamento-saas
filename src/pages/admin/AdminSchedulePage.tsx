@@ -18,6 +18,8 @@ import { Label } from "@/components/ui/label";
 import { Separator } from "@/components/ui/separator";
 import { Switch } from "@/components/ui/switch";
 
+import { useLoading } from "@/lib/loading";
+
 import { ArrowLeft, CalendarX2, Pencil, Plus, Trash2 } from "lucide-react";
 
 type BusinessHourItem = {
@@ -63,6 +65,7 @@ function fmtBusinessHourView(h: BusinessHourItem) {
 
 export default function AdminSchedulePage() {
   const nav = useNavigate();
+  const { show, hide } = useLoading();
 
   const [err, setErr] = useState<string | null>(null);
 
@@ -107,9 +110,15 @@ export default function AdminSchedulePage() {
     [],
   );
 
-  async function loadAll() {
+  async function loadAll(opts?: { showLoader?: boolean; label?: string }) {
+    const showLoader = opts?.showLoader ?? true;
+    const label = opts?.label ?? "Carregando horários...";
+
     setErr(null);
     setLoading(true);
+
+    if (showLoader) show(label);
+
     try {
       const [h, b] = await Promise.all([
         api.get<BusinessHourItem[]>("/schedule/business-hours"),
@@ -127,6 +136,7 @@ export default function AdminSchedulePage() {
     } catch (e: unknown) {
       setErr(getErrorMessage(e));
     } finally {
+      if (showLoader) hide();
       setLoading(false);
     }
   }
@@ -145,19 +155,24 @@ export default function AdminSchedulePage() {
   async function saveHoursFromModal() {
     setErr(null);
     setSavingHours(true);
+    show("Salvando expediente...");
+
     try {
       await api.put("/schedule/business-hours", { items: hoursDraft });
       setHoursOpen(false);
-      await loadAll();
+      await loadAll({ showLoader: false });
     } catch (e: unknown) {
       setErr(getErrorMessage(e));
     } finally {
+      hide();
       setSavingHours(false);
     }
   }
 
   async function createBlock() {
     setErr(null);
+    show("Criando bloqueio...");
+
     try {
       if (!blockForm.startAt || !blockForm.endAt) {
         throw new Error("Informe início e fim.");
@@ -174,19 +189,26 @@ export default function AdminSchedulePage() {
 
       setOpenBlock(false);
       setBlockForm({ startAt: "", endAt: "", reason: "" });
-      await loadAll();
+
+      await loadAll({ showLoader: false });
     } catch (e: unknown) {
       setErr(getErrorMessage(e));
+    } finally {
+      hide();
     }
   }
 
   async function deleteBlock(id: string) {
     setErr(null);
+    show("Removendo bloqueio...");
+
     try {
       await api.delete(`/schedule/blocks/${id}`);
-      await loadAll();
+      await loadAll({ showLoader: false });
     } catch (e: unknown) {
       setErr(getErrorMessage(e));
+    } finally {
+      hide();
     }
   }
 
@@ -299,9 +321,7 @@ export default function AdminSchedulePage() {
                 <div className="text-sm">
                   <span className="text-muted-foreground">Horário: </span>
                   <span
-                    className={
-                      h.active ? "font-medium" : "text-muted-foreground"
-                    }
+                    className={h.active ? "font-medium" : "text-muted-foreground"}
                   >
                     {fmtBusinessHourView(h)}
                   </span>
@@ -364,7 +384,12 @@ export default function AdminSchedulePage() {
               </div>
             </div>
 
-            <Button variant="outline" onClick={() => void loadAll()}>
+            <Button
+              variant="outline"
+              onClick={() =>
+                void loadAll({ label: "Atualizando lista...", showLoader: true })
+              }
+            >
               Atualizar lista
             </Button>
 

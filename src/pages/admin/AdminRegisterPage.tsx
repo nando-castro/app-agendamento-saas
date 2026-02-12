@@ -1,7 +1,8 @@
-import { useState } from 'react';
-import { useNavigate } from 'react-router-dom';
-import { api } from '../../lib/api';
-import { setAdminToken } from '../../lib/storage';
+import { useLoading } from "@/lib/loading";
+import { useState } from "react";
+import { Link, useNavigate } from "react-router-dom";
+import { api } from "../../lib/api";
+import { setAdminToken } from "../../lib/storage";
 
 function EyeIcon(props: React.SVGProps<SVGSVGElement>) {
   return (
@@ -61,15 +62,20 @@ function EyeOffIcon(props: React.SVGProps<SVGSVGElement>) {
 
 export default function AdminRegisterPage() {
   const nav = useNavigate();
+  const { show, hide } = useLoading();
+
   const [form, setForm] = useState({
-    tenantName: '',
-    tenantSlug: '',
-    adminName: '',
-    adminEmail: '',
-    adminPassword: '',
+    tenantName: "",
+    tenantSlug: "",
+    adminName: "",
+    adminEmail: "",
+    adminPassword: "",
   });
+
   const [showPassword, setShowPassword] = useState(false);
   const [err, setErr] = useState<string | null>(null);
+
+  // mantém só pra desabilitar botão/label
   const [loading, setLoading] = useState(false);
 
   function set<K extends keyof typeof form>(k: K, v: string) {
@@ -80,13 +86,16 @@ export default function AdminRegisterPage() {
     e.preventDefault();
     setErr(null);
     setLoading(true);
+    show("Criando conta...");
+
     try {
-      const { data } = await api.post('/auth/register', form);
+      const { data } = await api.post("/auth/register", form);
       setAdminToken(data.accessToken);
-      nav('/admin');
+      nav("/admin", { replace: true });
     } catch (e: any) {
-      setErr(e?.response?.data?.message ?? 'Falha no cadastro.');
+      setErr(e?.response?.data?.message ?? "Falha no cadastro.");
     } finally {
+      hide();
       setLoading(false);
     }
   }
@@ -99,31 +108,31 @@ export default function AdminRegisterPage() {
         <form onSubmit={onSubmit} className="mt-4 space-y-3">
           {(
             [
-              ['tenantName', 'Nome do negócio (ex: Studio Bela)'],
-              ['tenantSlug', 'Nome de usuário (ex: studio-bela)'],
-              ['adminName', 'Nome do administrador'],
-              ['adminEmail', 'E-mail do administrador'],
-              ['adminPassword', 'Senha do administrador'],
+              ["tenantName", "Nome do negócio (ex: Studio Bela)"],
+              ["tenantSlug", "Nome de usuário (ex: studio-bela)"],
+              ["adminName", "Nome do administrador"],
+              ["adminEmail", "E-mail do administrador"],
+              ["adminPassword", "Senha do administrador"],
             ] as const
           ).map(([k, label]) => (
             <div key={k}>
               <label className="text-sm">{label}</label>
 
-              {k === 'adminPassword' ? (
+              {k === "adminPassword" ? (
                 <div className="mt-1 relative">
                   <input
                     className="w-full rounded-xl border px-3 py-2 pr-11"
                     value={form[k]}
                     onChange={(e) => set(k, e.target.value)}
-                    type={showPassword ? 'text' : 'password'}
+                    type={showPassword ? "text" : "password"}
                     autoComplete="new-password"
                   />
                   <button
                     type="button"
                     onClick={() => setShowPassword((s) => !s)}
                     className="absolute right-2 top-1/2 -translate-y-1/2 grid h-9 w-9 place-items-center rounded-lg text-zinc-700 hover:bg-zinc-100"
-                    aria-label={showPassword ? 'Ocultar senha' : 'Mostrar senha'}
-                    title={showPassword ? 'Ocultar' : 'Mostrar'}
+                    aria-label={showPassword ? "Ocultar senha" : "Mostrar senha"}
+                    title={showPassword ? "Ocultar" : "Mostrar"}
                   >
                     {showPassword ? (
                       <EyeOffIcon className="h-5 w-5" />
@@ -149,14 +158,14 @@ export default function AdminRegisterPage() {
             disabled={loading}
             className="w-full rounded-xl bg-zinc-900 text-white py-2 disabled:opacity-60"
           >
-            {loading ? 'Criando...' : 'Criar'}
+            {loading ? "Criando..." : "Criar"}
           </button>
 
           <div className="text-sm text-zinc-600">
-            Já tem conta?{' '}
-            <a className="underline" href="/admin/login">
+            Já tem conta?{" "}
+            <Link className="underline" to="/admin/login">
               Entrar
-            </a>
+            </Link>
           </div>
         </form>
       </div>

@@ -17,6 +17,7 @@ import {
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 
+import { useLoading } from "@/lib/loading";
 import { Pencil, Plus, Power, SlidersHorizontal, X } from "lucide-react";
 
 const SCHEDULE_ROUTE = "/admin/schedule"; // <- ajuste se necessário
@@ -121,6 +122,7 @@ type Filter = "all" | "active" | "inactive";
 
 export default function AdminServicesPage() {
   const nav = useNavigate();
+  const { show, hide } = useLoading();
 
   const [items, setItems] = useState<Service[]>([]);
   const [loading, setLoading] = useState(true);
@@ -141,9 +143,14 @@ export default function AdminServicesPage() {
     [editing],
   );
 
-  async function load() {
+  async function load(opts?: { showLoader?: boolean; label?: string }) {
+    const showLoader = opts?.showLoader ?? true;
+    const label = opts?.label ?? "Carregando serviços...";
+
     setErr(null);
     setLoading(true);
+    if (showLoader) show(label);
+
     try {
       const [sRes, hRes] = await Promise.all([
         api.get<Service[]>("/services"),
@@ -158,6 +165,7 @@ export default function AdminServicesPage() {
     } catch (e: unknown) {
       setErr(getErrorMessage(e));
     } finally {
+      if (showLoader) hide();
       setLoading(false);
     }
   }
@@ -213,6 +221,8 @@ export default function AdminServicesPage() {
           : Number(form.signalPercentOverride),
     };
 
+    show(editing ? "Salvando serviço..." : "Criando serviço...");
+
     try {
       if (!basePayload.name) throw new Error("Informe o nome do serviço.");
       if (
@@ -221,10 +231,7 @@ export default function AdminServicesPage() {
       ) {
         throw new Error("Duração inválida.");
       }
-      if (
-        !Number.isFinite(basePayload.priceCents) ||
-        basePayload.priceCents < 0
-      ) {
+      if (!Number.isFinite(basePayload.priceCents) || basePayload.priceCents < 0) {
         throw new Error("Preço inválido.");
       }
 
@@ -240,9 +247,11 @@ export default function AdminServicesPage() {
       }
 
       setOpen(false);
-      await load();
+      await load({ showLoader: false });
     } catch (e: unknown) {
       setErr(getErrorMessage(e));
+    } finally {
+      hide();
     }
   }
 
@@ -257,11 +266,15 @@ export default function AdminServicesPage() {
       return;
     }
 
+    show(s.active ? "Desativando serviço..." : "Ativando serviço...");
+
     try {
       await api.patch(`/services/${s.id}`, { active: !s.active });
-      await load();
+      await load({ showLoader: false });
     } catch (e: unknown) {
       setErr(getErrorMessage(e));
+    } finally {
+      hide();
     }
   }
 
@@ -320,8 +333,7 @@ export default function AdminServicesPage() {
             <div className="text-sm">
               <div className="font-medium">Horários não configurados</div>
               <div className="text-xs text-muted-foreground">
-                Você só consegue ativar serviços depois de cadastrar o
-                expediente.
+                Você só consegue ativar serviços depois de cadastrar o expediente.
               </div>
             </div>
 
@@ -351,9 +363,7 @@ export default function AdminServicesPage() {
           return (
             <Card
               key={s.id}
-              className={["rounded-2xl", s.active ? "" : "bg-muted/30"].join(
-                " ",
-              )}
+              className={["rounded-2xl", s.active ? "" : "bg-muted/30"].join(" ")}
             >
               <CardContent className="p-4 space-y-3">
                 <div className="flex items-start justify-between gap-3">
@@ -402,17 +412,10 @@ export default function AdminServicesPage() {
 
                   <Button
                     variant={s.active ? "secondary" : "default"}
-                    className={[
-                      "rounded-xl gap-2",
-                      s.active ? "text-rose-700" : "",
-                    ].join(" ")}
+                    className={["rounded-xl gap-2", s.active ? "text-rose-700" : ""].join(" ")}
                     disabled={!s.active && !canActivate} // ✅ trava só na ativação
                     onClick={() => void toggleActive(s)}
-                    title={
-                      !s.active && !canActivate
-                        ? "Configure horários para ativar"
-                        : undefined
-                    }
+                    title={!s.active && !canActivate ? "Configure horários para ativar" : undefined}
                   >
                     <Power className="h-4 w-4" />
                     {s.active ? "Desativar" : "Ativar"}
@@ -430,7 +433,7 @@ export default function AdminServicesPage() {
         )}
       </div>
 
-      {/* Dialog filtro (igual o seu) */}
+      {/* Dialog filtro */}
       <Dialog open={filterOpen} onOpenChange={setFilterOpen}>
         <DialogContent className="sm:max-w-md">
           <DialogHeader>
@@ -478,7 +481,7 @@ export default function AdminServicesPage() {
         </DialogContent>
       </Dialog>
 
-      {/* Dialog criar/editar (mantém seu conteúdo; sem mudanças aqui além do que você já tinha) */}
+      {/* Dialog criar/editar */}
       <Dialog open={open} onOpenChange={setOpen}>
         <DialogContent>
           <DialogHeader>
