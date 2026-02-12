@@ -9,8 +9,22 @@ html, body, #root {
   width: 100%;
 }
 
+html, body {
+  overflow: hidden;
+}
+
 body {
   margin: 0;
+  overflow-x: hidden;
+}
+
+/* esconde scrollbar mas mantém scroll */
+.no-scrollbar {
+  -ms-overflow-style: none; /* IE/Edge antigo */
+  scrollbar-width: none;    /* Firefox */
+}
+.no-scrollbar::-webkit-scrollbar {
+  display: none;            /* Chrome/Safari */
 }
 
 @theme inline {

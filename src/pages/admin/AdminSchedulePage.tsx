@@ -1,4 +1,3 @@
-import { api } from "@/lib/api";
 import { getErrorMessage } from "@/lib/getErrorMessage";
 import { useEffect, useMemo, useState } from "react";
 import { useNavigate } from "react-router-dom";
@@ -20,16 +19,17 @@ import { Switch } from "@/components/ui/switch";
 
 import { useLoading } from "@/lib/loading";
 
+import scheduleService from "@/gateway/services/scheduleService";
 import { ArrowLeft, CalendarX2, Pencil, Plus, Trash2 } from "lucide-react";
 
-type BusinessHourItem = {
+export type BusinessHourItem = {
   weekday: number; // 0..6
   startTime: string; // "09:00"
   endTime: string; // "18:00"
   active: boolean;
 };
 
-type Block = {
+export type Block = {
   id: string;
   startAt: string;
   endAt: string;
@@ -121,10 +121,8 @@ export default function AdminSchedulePage() {
 
     try {
       const [h, b] = await Promise.all([
-        api.get<BusinessHourItem[]>("/schedule/business-hours"),
-        api.get<Block[]>("/schedule/blocks", {
-          params: { from: range.from, to: range.to },
-        }),
+        scheduleService.listarHorarios(),
+        scheduleService.listarBloqueios({ from: range.from, to: range.to }),
       ]);
 
       const configured = (h.data ?? []).length > 0;
@@ -158,7 +156,7 @@ export default function AdminSchedulePage() {
     show("Salvando expediente...");
 
     try {
-      await api.put("/schedule/business-hours", { items: hoursDraft });
+      await scheduleService.editarHorarios({ items: hoursDraft });
       setHoursOpen(false);
       await loadAll({ showLoader: false });
     } catch (e: unknown) {
@@ -181,7 +179,7 @@ export default function AdminSchedulePage() {
       const startIso = new Date(blockForm.startAt).toISOString();
       const endIso = new Date(blockForm.endAt).toISOString();
 
-      await api.post("/schedule/blocks", {
+      await scheduleService.criarBloqueios({
         startAt: startIso,
         endAt: endIso,
         reason: blockForm.reason.trim() === "" ? undefined : blockForm.reason,
@@ -203,7 +201,7 @@ export default function AdminSchedulePage() {
     show("Removendo bloqueio...");
 
     try {
-      await api.delete(`/schedule/blocks/${id}`);
+      await scheduleService.deletarBloqueio(id);
       await loadAll({ showLoader: false });
     } catch (e: unknown) {
       setErr(getErrorMessage(e));
@@ -286,7 +284,8 @@ export default function AdminSchedulePage() {
               <div className="text-sm">
                 <div className="font-medium">Nenhum horário cadastrado</div>
                 <div className="text-xs text-muted-foreground">
-                  Configure pelo menos um dia e horário para liberar agendamentos.
+                  Configure pelo menos um dia e horário para liberar
+                  agendamentos.
                 </div>
               </div>
 
@@ -321,7 +320,9 @@ export default function AdminSchedulePage() {
                 <div className="text-sm">
                   <span className="text-muted-foreground">Horário: </span>
                   <span
-                    className={h.active ? "font-medium" : "text-muted-foreground"}
+                    className={
+                      h.active ? "font-medium" : "text-muted-foreground"
+                    }
                   >
                     {fmtBusinessHourView(h)}
                   </span>
@@ -387,7 +388,10 @@ export default function AdminSchedulePage() {
             <Button
               variant="outline"
               onClick={() =>
-                void loadAll({ label: "Atualizando lista...", showLoader: true })
+                void loadAll({
+                  label: "Atualizando lista...",
+                  showLoader: true,
+                })
               }
             >
               Atualizar lista
