@@ -13,6 +13,7 @@ import PublicBookingPage from "@/pages/public/PublicBookingPage";
 
 import FullscreenLoader from "@/components/ui/FullscreenLoader";
 import { isJwtExpired } from "@/lib/jwt";
+import NotFoundPage from "./pages/NotFoundPage";
 
 function AdminGuard({ children }: { children: React.ReactNode }) {
   const location = useLocation();
@@ -87,6 +88,9 @@ export default function App() {
       </Route>
 
       <Route path="*" element={<Navigate to="/admin" replace />} />
+
+      {/* ✅ 404 global */}
+      <Route path="*" element={<NotFoundPage />} />
     </Routes>
   );
 }

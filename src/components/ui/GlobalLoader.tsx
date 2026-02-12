@@ -1,4 +1,4 @@
-import anim from "@/assets/lottie/auth-check.json";
+import anim from "@/assets/lotties/auth-check.json";
 import Lottie from "lottie-react";
 
 export default function GlobalLoader({ label }: { label?: string }) {
