@@ -1,4 +1,3 @@
-import { api } from "@/lib/api";
 import { getErrorMessage } from "@/lib/getErrorMessage";
 import type { Booking } from "@/lib/types";
 import { useEffect, useMemo, useState } from "react";
@@ -9,7 +8,8 @@ import { Card, CardContent } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Separator } from "@/components/ui/separator";
 
-import { useLoading } from "@/lib/loading"; // ✅ ADD
+import bookingService from "@/gateway/services/bookingsService";
+import { useLoading } from "@/lib/loading";
 import { Bell, CalendarDays, Filter, Phone, Search, User } from "lucide-react";
 
 function money(cents: number) {
@@ -21,7 +21,8 @@ function statusLabel(status: string) {
   if (s.includes("CONFIRM")) return { text: "CONFIRMADO", kind: "ok" as const };
   if (s.includes("CANCEL")) return { text: "CANCELADO", kind: "bad" as const };
   if (s.includes("PEND")) return { text: "PENDENTE", kind: "warn" as const };
-  if (s.includes("CONCLU")) return { text: "CONCLUÍDO", kind: "neutral" as const };
+  if (s.includes("CONCLU"))
+    return { text: "CONCLUÍDO", kind: "neutral" as const };
   return { text: s || "STATUS", kind: "neutral" as const };
 }
 
@@ -43,7 +44,7 @@ function fmtTime(iso: string) {
 }
 
 export default function AdminBookingsPage() {
-  const { show, hide } = useLoading(); // ✅ ADD
+  const { show, hide } = useLoading();
 
   const [err, setErr] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
@@ -67,8 +68,9 @@ export default function AdminBookingsPage() {
     show(label); // ✅ GLOBAL LOADER ON
 
     try {
-      const { data } = await api.get<Booking[]>("/bookings", {
-        params: { from: range.from, to: range.to },
+      const { data } = await bookingService.listarBookings({
+        from: range.from,
+        to: range.to,
       });
       setItems(data);
     } catch (e: unknown) {
@@ -95,7 +97,9 @@ export default function AdminBookingsPage() {
       <div className="flex items-start justify-between gap-3">
         <div className="min-w-0">
           <h1 className="text-xl font-semibold leading-tight">Agenda</h1>
-          <p className="text-sm text-muted-foreground">Gerencie seus horários</p>
+          <p className="text-sm text-muted-foreground">
+            Gerencie seus horários
+          </p>
         </div>
 
         <Button
@@ -111,7 +115,9 @@ export default function AdminBookingsPage() {
 
       {err && (
         <Card className="border-destructive/40 rounded-2xl">
-          <CardContent className="pt-4 text-sm text-destructive">{err}</CardContent>
+          <CardContent className="pt-4 text-sm text-destructive">
+            {err}
+          </CardContent>
         </Card>
       )}
 
@@ -120,26 +126,34 @@ export default function AdminBookingsPage() {
         <CardContent className="p-4 space-y-3">
           <div className="grid grid-cols-2 gap-3">
             <div className="space-y-1">
-              <div className="text-[11px] uppercase tracking-widest text-muted-foreground">De</div>
+              <div className="text-[11px] uppercase tracking-widest text-muted-foreground">
+                De
+              </div>
               <div className="relative">
                 <CalendarDays className="h-4 w-4 text-muted-foreground absolute left-3 top-1/2 -translate-y-1/2" />
                 <Input
                   type="date"
                   value={range.from}
-                  onChange={(e) => setRange((p) => ({ ...p, from: e.target.value }))}
+                  onChange={(e) =>
+                    setRange((p) => ({ ...p, from: e.target.value }))
+                  }
                   className="pl-10 rounded-2xl"
                 />
               </div>
             </div>
 
             <div className="space-y-1">
-              <div className="text-[11px] uppercase tracking-widest text-muted-foreground">Até</div>
+              <div className="text-[11px] uppercase tracking-widest text-muted-foreground">
+                Até
+              </div>
               <div className="relative">
                 <CalendarDays className="h-4 w-4 text-muted-foreground absolute left-3 top-1/2 -translate-y-1/2" />
                 <Input
                   type="date"
                   value={range.to}
-                  onChange={(e) => setRange((p) => ({ ...p, to: e.target.value }))}
+                  onChange={(e) =>
+                    setRange((p) => ({ ...p, to: e.target.value }))
+                  }
                   className="pl-10 rounded-2xl"
                 />
               </div>
@@ -191,7 +205,10 @@ export default function AdminBookingsPage() {
                 <div className="flex items-start justify-between gap-3">
                   <div className="min-w-0">
                     <div className="flex items-center gap-2">
-                      <Badge variant="secondary" className={badgeClass(st.kind)}>
+                      <Badge
+                        variant="secondary"
+                        className={badgeClass(st.kind)}
+                      >
                         {st.text}
                       </Badge>
                     </div>
@@ -203,7 +220,9 @@ export default function AdminBookingsPage() {
 
                   <div className="text-right shrink-0">
                     <div className="font-semibold">{total}</div>
-                    <div className="text-xs text-muted-foreground">Sinal: {signal}</div>
+                    <div className="text-xs text-muted-foreground">
+                      Sinal: {signal}
+                    </div>
                   </div>
                 </div>
 
@@ -211,7 +230,8 @@ export default function AdminBookingsPage() {
                   <div className="flex items-center gap-2">
                     <CalendarDays className="h-4 w-4" />
                     <span>
-                      {fmtDate(b.startAt)}, {fmtTime(b.startAt)} — {fmtTime(b.endAt)}
+                      {fmtDate(b.startAt)}, {fmtTime(b.startAt)} —{" "}
+                      {fmtTime(b.endAt)}
                     </span>
                   </div>
 
@@ -233,7 +253,9 @@ export default function AdminBookingsPage() {
                 <div className="flex items-center justify-between gap-3">
                   <div className="text-xs text-muted-foreground min-w-0">
                     <span className="uppercase tracking-widest">ID:</span>{" "}
-                    <span className="font-mono truncate">{(b as any).code ?? b.id}</span>
+                    <span className="font-mono truncate">
+                      {(b as any).code ?? b.id}
+                    </span>
                   </div>
 
                   <Button size="sm" className="rounded-full">

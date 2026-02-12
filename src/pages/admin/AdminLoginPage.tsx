@@ -1,7 +1,7 @@
+import authService from "@/gateway/services/authService";
 import { useLoading } from "@/lib/loading";
-import { useState } from "react";
+import { useMemo, useState } from "react";
 import { Link, useLocation, useNavigate } from "react-router-dom";
-import { api } from "../../lib/api";
 import { setAdminToken } from "../../lib/storage";
 
 function EyeIcon(props: React.SVGProps<SVGSVGElement>) {
@@ -62,10 +62,15 @@ function EyeOffIcon(props: React.SVGProps<SVGSVGElement>) {
 
 type LocationState = { from?: string };
 
+function isValidEmail(v: string) {
+  // simples e suficiente pro front
+  return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(v);
+}
+
 export default function AdminLoginPage() {
   const nav = useNavigate();
   const location = useLocation();
-  const { show, hide } = useLoading(); // <-- 2) USA O HOOK
+  const { show, hide } = useLoading();
 
   const from =
     (location.state as LocationState | null)?.from &&
@@ -76,27 +81,58 @@ export default function AdminLoginPage() {
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [showPassword, setShowPassword] = useState(false);
+
+  // erro do servidor (login inválido, etc.)
   const [err, setErr] = useState<string | null>(null);
+
+  // validação de input (digitou / formato)
+  const [touched, setTouched] = useState({ email: false, password: false });
 
   // opcional: mantém só pra travar botão
   const [loading, setLoading] = useState(false);
 
+  const emailTrim = email.trim();
+
+  const fieldErrors = useMemo(() => {
+    const emailError =
+      !emailTrim
+        ? "Informe o e-mail."
+        : !isValidEmail(emailTrim)
+          ? "E-mail inválido."
+          : null;
+
+    const passwordError = !password ? "Informe a senha." : null;
+
+    return { emailError, passwordError };
+  }, [emailTrim, password]);
+
+  const showEmailError = touched.email ? fieldErrors.emailError : null;
+  const showPasswordError = touched.password ? fieldErrors.passwordError : null;
+
+  const canSubmit = !fieldErrors.emailError && !fieldErrors.passwordError && !loading;
+
   async function onSubmit(e: React.FormEvent) {
     e.preventDefault();
     setErr(null);
-    setLoading(true);
 
-    show("Entrando..."); // <-- 3) LIGA O LOADER GLOBAL
+    // marca como "tocados" pra exibir os erros
+    setTouched({ email: true, password: true });
+
+    // bloqueia submit se inválido
+    if (fieldErrors.emailError || fieldErrors.passwordError) return;
+
+    setLoading(true);
+    show("Entrando...");
 
     try {
-      const { data } = await api.post("/auth/login", { email, password });
+      const { data } = await authService.login({ email: emailTrim, password });
       setAdminToken(data.accessToken);
 
       nav(from, { replace: true });
     } catch (e: any) {
       setErr(e?.response?.data?.message ?? "Falha no login.");
     } finally {
-      hide();            // <-- 4) DESLIGA O LOADER GLOBAL
+      hide();
       setLoading(false);
     }
   }
@@ -106,26 +142,51 @@ export default function AdminLoginPage() {
       <div className="w-full max-w-md rounded-2xl bg-white shadow p-6">
         <h1 className="text-xl font-semibold">Login Admin</h1>
 
-        <form onSubmit={onSubmit} className="mt-4 space-y-3">
+        <form onSubmit={onSubmit} className="mt-4 space-y-3" noValidate>
           <div>
             <label className="text-sm">E-mail</label>
             <input
-              className="mt-1 w-full rounded-xl border px-3 py-2"
+              className={[
+                "mt-1 w-full rounded-xl border px-3 py-2 outline-none",
+                showEmailError ? "border-red-500 ring-2 ring-red-100" : "focus:ring-2 focus:ring-zinc-200",
+              ].join(" ")}
               value={email}
-              onChange={(e) => setEmail(e.target.value)}
+              onChange={(e) => {
+                setEmail(e.target.value);
+                setErr(null);
+              }}
+              onBlur={() => setTouched((t) => ({ ...t, email: true }))}
               autoComplete="email"
+              type="email"
+              inputMode="email"
+              aria-invalid={!!showEmailError}
+              aria-describedby="email-error"
             />
+            {showEmailError && (
+              <div id="email-error" className="mt-1 text-xs text-red-600">
+                {showEmailError}
+              </div>
+            )}
           </div>
 
           <div>
             <label className="text-sm">Senha</label>
             <div className="mt-1 relative">
               <input
-                className="w-full rounded-xl border px-3 py-2 pr-11"
+                className={[
+                  "w-full rounded-xl border px-3 py-2 pr-11 outline-none",
+                  showPasswordError ? "border-red-500 ring-2 ring-red-100" : "focus:ring-2 focus:ring-zinc-200",
+                ].join(" ")}
                 value={password}
-                onChange={(e) => setPassword(e.target.value)}
+                onChange={(e) => {
+                  setPassword(e.target.value);
+                  setErr(null);
+                }}
+                onBlur={() => setTouched((t) => ({ ...t, password: true }))}
                 type={showPassword ? "text" : "password"}
                 autoComplete="current-password"
+                aria-invalid={!!showPasswordError}
+                aria-describedby="password-error"
               />
               <button
                 type="button"
@@ -134,19 +195,20 @@ export default function AdminLoginPage() {
                 aria-label={showPassword ? "Ocultar senha" : "Mostrar senha"}
                 title={showPassword ? "Ocultar" : "Mostrar"}
               >
-                {showPassword ? (
-                  <EyeOffIcon className="h-5 w-5" />
-                ) : (
-                  <EyeIcon className="h-5 w-5" />
-                )}
+                {showPassword ? <EyeOffIcon className="h-5 w-5" /> : <EyeIcon className="h-5 w-5" />}
               </button>
             </div>
+            {showPasswordError && (
+              <div id="password-error" className="mt-1 text-xs text-red-600">
+                {showPasswordError}
+              </div>
+            )}
           </div>
 
           {err && <div className="text-sm text-red-600">{err}</div>}
 
           <button
-            disabled={loading}
+            disabled={!canSubmit}
             className="w-full rounded-xl bg-zinc-900 text-white py-2 disabled:opacity-60"
           >
             {loading ? "Entrando..." : "Entrar"}

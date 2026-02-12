@@ -88,7 +88,7 @@ function getValidLinkForService(links: BookingLink[], serviceId: string): Bookin
 
 export default function AdminDashboardPage() {
   const nav = useNavigate();
-  const { show, hide } = useLoading(); // ✅ ADD
+  const { show, hide } = useLoading();
 
   const [services, setServices] = useState<Service[]>([]);
   const [links, setLinks] = useState<BookingLink[]>([]);
