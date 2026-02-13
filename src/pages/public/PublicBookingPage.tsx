@@ -312,478 +312,493 @@ export default function PublicBookingPage() {
   }
 
   return (
-    <div className="min-h-screen p-6 bg-zinc-50">
-      <div className="max-w-3xl mx-auto space-y-6">
-        <header className="rounded-2xl bg-white shadow p-4">
-          <h1 className="text-xl font-semibold">Agendamento</h1>
-          <p className="text-sm text-zinc-600">
-            {inPaymentFlow
-              ? approved
-                ? "Pagamento confirmado."
-                : expired
-                  ? "O prazo para pagamento terminou."
-                  : "Finalize o pagamento para confirmar."
-              : "Escolha serviço, data e horário."}
-          </p>
-        </header>
+    <div className="fixed inset-0 overflow-y-auto overscroll-y-contain bg-zinc-50 no-scrollbar [-webkit-overflow-scrolling:touch]">
+      <div className="min-h-full p-4 sm:p-6 pb-24">
+        <div className="max-w-3xl mx-auto space-y-6">
+          <header className="rounded-2xl bg-white shadow p-4">
+            <h1 className="text-xl font-semibold">Agendamento</h1>
+            <p className="text-sm text-zinc-600">
+              {inPaymentFlow
+                ? approved
+                  ? "Pagamento confirmado."
+                  : expired
+                    ? "O prazo para pagamento terminou."
+                    : "Finalize o pagamento para confirmar."
+                : "Escolha serviço, data e horário."}
+            </p>
+          </header>
 
-        {err && (
-          <div className="rounded-xl bg-red-50 border border-red-200 p-3 text-sm text-red-700">
-            {err}
-          </div>
-        )}
+          {err && (
+            <div className="rounded-xl bg-red-50 border border-red-200 p-3 text-sm text-red-700">
+              {err}
+            </div>
+          )}
 
-        {loading ? (
-          <div className="text-sm text-zinc-600">Carregando...</div>
-        ) : (
-          <>
-            {/* FORMULARIO (some quando entrou no fluxo de pagamento) */}
-            {!inPaymentFlow && (
-              <>
-                <section className="rounded-2xl bg-white shadow p-4 space-y-4">
-                  <div className="grid gap-3 sm:grid-cols-2">
-                    <div>
-                      <label className="text-sm">Serviço</label>
-                      <select
-                        className="mt-1 w-full rounded-xl border px-3 py-2"
-                        value={serviceId}
-                        onChange={(e) => setServiceId(e.target.value)}
-                      >
-                        {services.map((s) => (
-                          <option key={s.id} value={s.id}>
-                            {s.name} • {s.durationMinutes}min •{" "}
-                            {formatMoney(s.priceCents)}
-                          </option>
-                        ))}
-                      </select>
-                    </div>
-
-                    <div>
-                      <label className="text-sm">Data</label>
-                      <input
-                        type="date"
-                        className="mt-1 w-full rounded-xl border px-3 py-2"
-                        value={date}
-                        onChange={(e) => setDate(e.target.value)}
-                      />
-                    </div>
-                  </div>
-
-                  <div>
-                    <div className="text-sm font-medium">
-                      Horários disponíveis
-                    </div>
-                    <div className="mt-2 grid grid-cols-2 sm:grid-cols-4 gap-2">
-                      {availability?.slots?.map((s) => (
-                        <button
-                          key={s.startAt}
-                          className={[
-                            "rounded-xl border px-3 py-2 text-sm",
-                            selectedStartAt === s.startAt
-                              ? "bg-zinc-900 text-white"
-                              : "bg-white",
-                          ].join(" ")}
-                          onClick={() => setSelectedStartAt(s.startAt)}
+          {loading ? (
+            <div className="text-sm text-zinc-600">Carregando...</div>
+          ) : (
+            <>
+              {/* FORMULARIO (some quando entrou no fluxo de pagamento) */}
+              {!inPaymentFlow && (
+                <>
+                  <section className="rounded-2xl bg-white shadow p-4 space-y-4">
+                    <div className="grid gap-3 sm:grid-cols-2">
+                      <div>
+                        <label className="text-sm">Serviço</label>
+                        <select
+                          className="mt-1 w-full rounded-xl border px-3 py-2"
+                          value={serviceId}
+                          onChange={(e) => setServiceId(e.target.value)}
                         >
-                          {new Date(s.startAt).toLocaleTimeString([], {
-                            hour: "2-digit",
-                            minute: "2-digit",
-                          })}
-                        </button>
-                      ))}
-                      {availability && availability.slots.length === 0 && (
-                        <div className="text-sm text-zinc-600 col-span-full">
-                          Sem horários para este dia.
-                        </div>
-                      )}
-                    </div>
-                  </div>
-                </section>
-
-                <section className="rounded-2xl bg-white shadow p-4 space-y-3">
-                  <h2 className="font-semibold">Seus dados</h2>
-
-                  <div className="grid gap-3 sm:grid-cols-2">
-                    <div>
-                      <label className="text-sm">Nome</label>
-                      <input
-                        className="mt-1 w-full rounded-xl border px-3 py-2"
-                        value={customer.name}
-                        onChange={(e) =>
-                          setCustomer((p) => ({ ...p, name: e.target.value }))
-                        }
-                      />
-                    </div>
-                    <div>
-                      <label className="text-sm">Telefone</label>
-                      <input
-                        className="mt-1 w-full rounded-xl border px-3 py-2"
-                        value={customer.phone}
-                        onChange={(e) =>
-                          setCustomer((p) => ({ ...p, phone: e.target.value }))
-                        }
-                      />
-                    </div>
-                  </div>
-
-                  <div>
-                    <label className="text-sm">Email</label>
-                    <input
-                      className="mt-1 w-full rounded-xl border px-3 py-2"
-                      value={customer.email}
-                      onChange={(e) =>
-                        setCustomer((p) => ({ ...p, email: e.target.value }))
-                      }
-                    />
-
-                    <div className="text-xs text-zinc-500 mt-1">
-                      Obs.: Para gerar PIX, o Mercado Pago normalmente exige
-                      email do pagador.
-                    </div>
-                  </div>
-
-                  <button
-                    className="w-full rounded-xl bg-zinc-900 text-white py-2 disabled:opacity-60"
-                    disabled={
-                      !selectedStartAt ||
-                      !customer.name ||
-                      !customer.phone ||
-                      !customer.email.trim() ||
-                      pixLoading
-                    }
-                    onClick={() => void createBooking()}
-                  >
-                    Confirmar agendamento
-                  </button>
-
-                  {selectedService && (
-                    <div className="text-sm text-zinc-600">
-                      Serviço:{" "}
-                      <span className="font-medium">
-                        {selectedService.name}
-                      </span>{" "}
-                      • {formatMoney(selectedService.priceCents)}
-                    </div>
-                  )}
-                </section>
-              </>
-            )}
-
-            {/* TELA DE PAGAMENTO PIX */}
-            {inPaymentFlow && created && (
-              <section className="rounded-2xl bg-white shadow p-4 space-y-4">
-                <div className="flex items-start justify-between gap-4">
-                  <div>
-                    <h2 className="text-lg font-semibold">Pagamento via PIX</h2>
-                    <p className="text-sm text-zinc-600">
-                      {approved
-                        ? "Pagamento aprovado. Seu agendamento está confirmado."
-                        : expired
-                          ? "Reserva expirada. Será necessário agendar novamente."
-                          : "Agendamento reservado. Faça o pagamento para confirmar."}
-                    </p>
-                  </div>
-
-                  <div className="text-right">
-                    <div
-                      className={[
-                        "inline-flex items-center rounded-full px-3 py-1 text-xs font-medium",
-                        approved
-                          ? "bg-green-100 text-green-800"
-                          : expired
-                            ? "bg-red-100 text-red-800"
-                            : "bg-amber-100 text-amber-800",
-                      ].join(" ")}
-                    >
-                      {approved
-                        ? "Pagamento aprovado"
-                        : expired
-                          ? "Reserva expirada"
-                          : "Aguardando pagamento"}
-                    </div>
-
-                    {created.expiresAt && awaitingPayment && (
-                      <div className="mt-1 text-xs text-zinc-600">
-                        Expira em:{" "}
-                        <span className="font-mono">
-                          {remainingMs == null ? "--:--" : msToMMSS(remainingMs)}
-                        </span>
+                          {services.map((s) => (
+                            <option key={s.id} value={s.id}>
+                              {s.name} • {s.durationMinutes}min •{" "}
+                              {formatMoney(s.priceCents)}
+                            </option>
+                          ))}
+                        </select>
                       </div>
-                    )}
-                  </div>
-                </div>
 
-                <div className="rounded-xl bg-zinc-50 border p-3 text-sm">
-                  <div>
-                    Código:{" "}
-                    <span className="font-mono font-semibold">
-                      {created.code}
-                    </span>
-                  </div>
-                  <div>Horário: {new Date(created.startAt).toLocaleString()}</div>
-                  <div className="mt-2 text-zinc-700">
-                    {created.signalAmountCents > 0 ? (
-                      <>
-                        Valor do sinal:{" "}
-                        <span className="font-semibold">
-                          {formatMoney(created.signalAmountCents)}
-                        </span>
-                        <span className="text-xs text-zinc-500">
-                          {" "}
-                          (para confirmar)
-                        </span>
-                      </>
-                    ) : (
-                      <>
-                        Valor:{" "}
-                        <span className="font-semibold">
-                          {formatMoney(created.totalPriceCents)}
-                        </span>
-                      </>
-                    )}
-                  </div>
-                </div>
-
-                {pixErr && (
-                  <div className="rounded-xl bg-red-50 border border-red-200 p-3 text-sm text-red-700">
-                    {pixErr}
-                  </div>
-                )}
-
-                {!pix && !pixLoading && awaitingPayment && (
-                  <div className="space-y-2">
-                    <div className="text-sm text-zinc-700">
-                      Precisamos gerar o PIX para você. Se o email estiver vazio,
-                      informe abaixo:
+                      <div>
+                        <label className="text-sm">Data</label>
+                        <input
+                          type="date"
+                          className="mt-1 w-full rounded-xl border px-3 py-2"
+                          value={date}
+                          onChange={(e) => setDate(e.target.value)}
+                        />
+                      </div>
                     </div>
 
-                    <input
-                      className="w-full rounded-xl border px-3 py-2"
-                      placeholder="Email do pagador"
-                      value={customer.email}
-                      onChange={(e) =>
-                        setCustomer((p) => ({ ...p, email: e.target.value }))
-                      }
-                    />
+                    <div>
+                      <div className="text-sm font-medium">
+                        Horários disponíveis
+                      </div>
+                      <div className="mt-2 grid grid-cols-2 sm:grid-cols-4 gap-2">
+                        {availability?.slots?.map((s) => (
+                          <button
+                            key={s.startAt}
+                            className={[
+                              "rounded-xl border px-3 py-2 text-sm",
+                              selectedStartAt === s.startAt
+                                ? "bg-zinc-900 text-white"
+                                : "bg-white",
+                            ].join(" ")}
+                            onClick={() => setSelectedStartAt(s.startAt)}
+                          >
+                            {new Date(s.startAt).toLocaleTimeString([], {
+                              hour: "2-digit",
+                              minute: "2-digit",
+                            })}
+                          </button>
+                        ))}
+                        {availability && availability.slots.length === 0 && (
+                          <div className="text-sm text-zinc-600 col-span-full">
+                            Sem horários para este dia.
+                          </div>
+                        )}
+                      </div>
+                    </div>
+                  </section>
+
+                  <section className="rounded-2xl bg-white shadow p-4 space-y-3">
+                    <h2 className="font-semibold">Seus dados</h2>
+
+                    <div className="grid gap-3 sm:grid-cols-2">
+                      <div>
+                        <label className="text-sm">Nome</label>
+                        <input
+                          className="mt-1 w-full rounded-xl border px-3 py-2"
+                          value={customer.name}
+                          onChange={(e) =>
+                            setCustomer((p) => ({ ...p, name: e.target.value }))
+                          }
+                        />
+                      </div>
+                      <div>
+                        <label className="text-sm">Telefone</label>
+                        <input
+                          className="mt-1 w-full rounded-xl border px-3 py-2"
+                          value={customer.phone}
+                          onChange={(e) =>
+                            setCustomer((p) => ({
+                              ...p,
+                              phone: e.target.value,
+                            }))
+                          }
+                        />
+                      </div>
+                    </div>
+
+                    <div>
+                      <label className="text-sm">Email</label>
+                      <input
+                        className="mt-1 w-full rounded-xl border px-3 py-2"
+                        value={customer.email}
+                        onChange={(e) =>
+                          setCustomer((p) => ({ ...p, email: e.target.value }))
+                        }
+                      />
+
+                      <div className="text-xs text-zinc-500 mt-1">
+                        Obs.: Para gerar PIX, o Mercado Pago normalmente exige
+                        email do pagador.
+                      </div>
+                    </div>
 
                     <button
                       className="w-full rounded-xl bg-zinc-900 text-white py-2 disabled:opacity-60"
-                      disabled={!customer.email}
-                      onClick={() => void startPixFlow(created, customer.email)}
+                      disabled={
+                        !selectedStartAt ||
+                        !customer.name ||
+                        !customer.phone ||
+                        !customer.email.trim() ||
+                        pixLoading
+                      }
+                      onClick={() => void createBooking()}
                     >
-                      Gerar PIX
+                      Confirmar agendamento
                     </button>
-                  </div>
-                )}
 
-                {pixLoading && (
-                  <div className="text-sm text-zinc-600">Gerando PIX...</div>
-                )}
-
-                {approved && (
-                  <div className="grid gap-4 sm:grid-cols-2">
-                    <div className="rounded-2xl border p-4 bg-white">
-                      <div className="flex flex-col items-center justify-center py-10">
-                        <div className="h-20 w-20 rounded-full bg-lime-500 flex items-center justify-center">
-                          <svg
-                            viewBox="0 0 24 24"
-                            fill="none"
-                            stroke="currentColor"
-                            strokeWidth="3"
-                            className="h-10 w-10 text-white"
-                          >
-                            <path
-                              d="M20 6L9 17l-5-5"
-                              strokeLinecap="round"
-                              strokeLinejoin="round"
-                            />
-                          </svg>
-                        </div>
-                        <div className="mt-4 text-sm font-semibold text-zinc-900">
-                          Confirmado
-                        </div>
-                        <div className="text-xs text-zinc-500 mt-1 text-center">
-                          Pagamento identificado.
-                        </div>
+                    {selectedService && (
+                      <div className="text-sm text-zinc-600">
+                        Serviço:{" "}
+                        <span className="font-medium">
+                          {selectedService.name}
+                        </span>{" "}
+                        • {formatMoney(selectedService.priceCents)}
                       </div>
+                    )}
+                  </section>
+                </>
+              )}
+
+              {/* TELA DE PAGAMENTO PIX */}
+              {inPaymentFlow && created && (
+                <section className="rounded-2xl bg-white shadow p-4 space-y-4">
+                  <div className="flex items-start justify-between gap-4">
+                    <div>
+                      <h2 className="text-lg font-semibold">
+                        Pagamento via PIX
+                      </h2>
+                      <p className="text-sm text-zinc-600">
+                        {approved
+                          ? "Pagamento aprovado. Seu agendamento está confirmado."
+                          : expired
+                            ? "Reserva expirada. Será necessário agendar novamente."
+                            : "Agendamento reservado. Faça o pagamento para confirmar."}
+                      </p>
                     </div>
 
-                    <div className="rounded-2xl border p-4 bg-white">
-                      <div className="text-sm font-medium">
-                        Detalhes do agendamento
+                    <div className="text-right">
+                      <div
+                        className={[
+                          "inline-flex items-center rounded-full px-3 py-1 text-xs font-medium",
+                          approved
+                            ? "bg-green-100 text-green-800"
+                            : expired
+                              ? "bg-red-100 text-red-800"
+                              : "bg-amber-100 text-amber-800",
+                        ].join(" ")}
+                      >
+                        {approved
+                          ? "Pagamento aprovado"
+                          : expired
+                            ? "Reserva expirada"
+                            : "Aguardando pagamento"}
                       </div>
 
-                      <div className="mt-3 space-y-2 text-sm">
-                        <div className="flex justify-between gap-4">
-                          <span className="text-zinc-500">Código</span>
-                          <span className="font-mono font-semibold">
-                            {created.code}
+                      {created.expiresAt && awaitingPayment && (
+                        <div className="mt-1 text-xs text-zinc-600">
+                          Expira em:{" "}
+                          <span className="font-mono">
+                            {remainingMs == null
+                              ? "--:--"
+                              : msToMMSS(remainingMs)}
                           </span>
                         </div>
-
-                        <div className="flex justify-between gap-4">
-                          <span className="text-zinc-500">Horário</span>
-                          <span className="font-medium">
-                            {new Date(created.startAt).toLocaleString()}
-                          </span>
-                        </div>
-
-                        {selectedService && (
-                          <div className="flex justify-between gap-4">
-                            <span className="text-zinc-500">Serviço</span>
-                            <span className="font-medium">
-                              {selectedService.name} •{" "}
-                              {selectedService.durationMinutes}min
-                            </span>
-                          </div>
-                        )}
-
-                        <div className="flex justify-between gap-4">
-                          <span className="text-zinc-500">
-                            {created.signalAmountCents > 0 ? "Sinal" : "Total"}
-                          </span>
-                          <span className="font-semibold">
-                            {formatMoney(
-                              created.signalAmountCents > 0
-                                ? created.signalAmountCents
-                                : created.totalPriceCents,
-                            )}
-                          </span>
-                        </div>
-
-                        <div className="pt-3 mt-3 border-t">
-                          <div className="text-xs text-zinc-500 mb-2">
-                            Cliente
-                          </div>
-                          <div className="text-sm">{customer.name}</div>
-                          <div className="text-sm text-zinc-600">
-                            {customer.phone}
-                          </div>
-                          <div className="text-sm text-zinc-600">
-                            {customer.email}
-                          </div>
-                        </div>
-                      </div>
-                    </div>
-                  </div>
-                )}
-
-                {awaitingPayment && pix && (
-                  <div className="grid gap-4 sm:grid-cols-2">
-                    <div className="rounded-2xl border p-4 bg-white">
-                      <div className="text-sm font-medium">QR Code</div>
-                      <div className="mt-3 flex justify-center">
-                        {pix.qrCodeBase64 ? (
-                          <img
-                            alt="QR Code PIX"
-                            className="w-56 h-56"
-                            src={`data:image/png;base64,${pix.qrCodeBase64}`}
-                          />
-                        ) : (
-                          <div className="text-sm text-zinc-600">
-                            QR Code indisponível.
-                          </div>
-                        )}
-                      </div>
-
-                      {pix.ticketUrl && (
-                        <a
-                          className="mt-3 block text-sm text-blue-600 hover:underline"
-                          href={pix.ticketUrl}
-                          target="_blank"
-                          rel="noreferrer"
-                        >
-                          Abrir link do pagamento
-                        </a>
                       )}
                     </div>
+                  </div>
 
-                    <div className="rounded-2xl border p-4 bg-white space-y-3">
-                      <div>
-                        <div className="text-sm font-medium">
-                          Pix “copia e cola”
+                  <div className="rounded-xl bg-zinc-50 border p-3 text-sm">
+                    <div>
+                      Código:{" "}
+                      <span className="font-mono font-semibold">
+                        {created.code}
+                      </span>
+                    </div>
+                    <div>
+                      Horário: {new Date(created.startAt).toLocaleString()}
+                    </div>
+                    <div className="mt-2 text-zinc-700">
+                      {created.signalAmountCents > 0 ? (
+                        <>
+                          Valor do sinal:{" "}
+                          <span className="font-semibold">
+                            {formatMoney(created.signalAmountCents)}
+                          </span>
+                          <span className="text-xs text-zinc-500">
+                            {" "}
+                            (para confirmar)
+                          </span>
+                        </>
+                      ) : (
+                        <>
+                          Valor:{" "}
+                          <span className="font-semibold">
+                            {formatMoney(created.totalPriceCents)}
+                          </span>
+                        </>
+                      )}
+                    </div>
+                  </div>
+
+                  {pixErr && (
+                    <div className="rounded-xl bg-red-50 border border-red-200 p-3 text-sm text-red-700">
+                      {pixErr}
+                    </div>
+                  )}
+
+                  {!pix && !pixLoading && awaitingPayment && (
+                    <div className="space-y-2">
+                      <div className="text-sm text-zinc-700">
+                        Precisamos gerar o PIX para você. Se o email estiver
+                        vazio, informe abaixo:
+                      </div>
+
+                      <input
+                        className="w-full rounded-xl border px-3 py-2"
+                        placeholder="Email do pagador"
+                        value={customer.email}
+                        onChange={(e) =>
+                          setCustomer((p) => ({ ...p, email: e.target.value }))
+                        }
+                      />
+
+                      <button
+                        className="w-full rounded-xl bg-zinc-900 text-white py-2 disabled:opacity-60"
+                        disabled={!customer.email}
+                        onClick={() =>
+                          void startPixFlow(created, customer.email)
+                        }
+                      >
+                        Gerar PIX
+                      </button>
+                    </div>
+                  )}
+
+                  {pixLoading && (
+                    <div className="text-sm text-zinc-600">Gerando PIX...</div>
+                  )}
+
+                  {approved && (
+                    <div className="grid gap-4 sm:grid-cols-2">
+                      <div className="rounded-2xl border p-4 bg-white">
+                        <div className="flex flex-col items-center justify-center py-10">
+                          <div className="h-20 w-20 rounded-full bg-lime-500 flex items-center justify-center">
+                            <svg
+                              viewBox="0 0 24 24"
+                              fill="none"
+                              stroke="currentColor"
+                              strokeWidth="3"
+                              className="h-10 w-10 text-white"
+                            >
+                              <path
+                                d="M20 6L9 17l-5-5"
+                                strokeLinecap="round"
+                                strokeLinejoin="round"
+                              />
+                            </svg>
+                          </div>
+                          <div className="mt-4 text-sm font-semibold text-zinc-900">
+                            Confirmado
+                          </div>
+                          <div className="text-xs text-zinc-500 mt-1 text-center">
+                            Pagamento identificado.
+                          </div>
                         </div>
-                        <textarea
-                          readOnly
-                          className="mt-2 w-full h-36 rounded-xl border p-2 text-xs font-mono"
-                          value={pix.qrCode ?? ""}
-                        />
-                        <div className="flex gap-2 mt-2">
-                          <button
-                            className="flex-1 rounded-xl bg-zinc-900 text-white py-2 text-sm disabled:opacity-60"
-                            disabled={!pix.qrCode}
-                            onClick={() => void copyPixCode()}
-                          >
-                            Copiar código
-                          </button>
+                      </div>
 
+                      <div className="rounded-2xl border p-4 bg-white">
+                        <div className="text-sm font-medium">
+                          Detalhes do agendamento
+                        </div>
+
+                        <div className="mt-3 space-y-2 text-sm">
+                          <div className="flex justify-between gap-4">
+                            <span className="text-zinc-500">Código</span>
+                            <span className="font-mono font-semibold">
+                              {created.code}
+                            </span>
+                          </div>
+
+                          <div className="flex justify-between gap-4">
+                            <span className="text-zinc-500">Horário</span>
+                            <span className="font-medium">
+                              {new Date(created.startAt).toLocaleString()}
+                            </span>
+                          </div>
+
+                          {selectedService && (
+                            <div className="flex justify-between gap-4">
+                              <span className="text-zinc-500">Serviço</span>
+                              <span className="font-medium">
+                                {selectedService.name} •{" "}
+                                {selectedService.durationMinutes}min
+                              </span>
+                            </div>
+                          )}
+
+                          <div className="flex justify-between gap-4">
+                            <span className="text-zinc-500">
+                              {created.signalAmountCents > 0
+                                ? "Sinal"
+                                : "Total"}
+                            </span>
+                            <span className="font-semibold">
+                              {formatMoney(
+                                created.signalAmountCents > 0
+                                  ? created.signalAmountCents
+                                  : created.totalPriceCents,
+                              )}
+                            </span>
+                          </div>
+
+                          <div className="pt-3 mt-3 border-t">
+                            <div className="text-xs text-zinc-500 mb-2">
+                              Cliente
+                            </div>
+                            <div className="text-sm">{customer.name}</div>
+                            <div className="text-sm text-zinc-600">
+                              {customer.phone}
+                            </div>
+                            <div className="text-sm text-zinc-600">
+                              {customer.email}
+                            </div>
+                          </div>
+                        </div>
+                      </div>
+                    </div>
+                  )}
+
+                  {awaitingPayment && pix && (
+                    <div className="grid gap-4 sm:grid-cols-2">
+                      <div className="rounded-2xl border p-4 bg-white">
+                        <div className="text-sm font-medium">QR Code</div>
+                        <div className="mt-3 flex justify-center">
+                          {pix.qrCodeBase64 ? (
+                            <img
+                              alt="QR Code PIX"
+                              className="w-56 h-56"
+                              src={`data:image/png;base64,${pix.qrCodeBase64}`}
+                            />
+                          ) : (
+                            <div className="text-sm text-zinc-600">
+                              QR Code indisponível.
+                            </div>
+                          )}
+                        </div>
+
+                        {pix.ticketUrl && (
+                          <a
+                            className="mt-3 block text-sm text-blue-600 hover:underline"
+                            href={pix.ticketUrl}
+                            target="_blank"
+                            rel="noreferrer"
+                          >
+                            Abrir link do pagamento
+                          </a>
+                        )}
+                      </div>
+
+                      <div className="rounded-2xl border p-4 bg-white space-y-3">
+                        <div>
+                          <div className="text-sm font-medium">
+                            Pix “copia e cola”
+                          </div>
+                          <textarea
+                            readOnly
+                            className="mt-2 w-full h-36 rounded-xl border p-2 text-xs font-mono"
+                            value={pix.qrCode ?? ""}
+                          />
+                          <div className="flex gap-2 mt-2">
+                            <button
+                              className="flex-1 rounded-xl bg-zinc-900 text-white py-2 text-sm disabled:opacity-60"
+                              disabled={!pix.qrCode}
+                              onClick={() => void copyPixCode()}
+                            >
+                              Copiar código
+                            </button>
+
+                            <button
+                              className="flex-1 rounded-xl border py-2 text-sm"
+                              onClick={async () => {
+                                try {
+                                  const b = await loadBooking(created.id);
+                                  setCreated(b);
+                                  if (pix.mpPaymentId) {
+                                    const mp = await loadMpPaymentStatus(
+                                      pix.mpPaymentId,
+                                    );
+                                    const mpStatus = mp?.status as
+                                      | string
+                                      | undefined;
+                                    if (mpStatus) {
+                                      setPix((p) =>
+                                        p ? { ...p, status: mpStatus } : p,
+                                      );
+                                    }
+                                  }
+                                } catch {}
+                              }}
+                            >
+                              Atualizar
+                            </button>
+                          </div>
+                        </div>
+
+                        <div className="text-xs text-zinc-500">
+                          A tela atualiza automaticamente. Assim que o pagamento
+                          for aprovado, seu agendamento será confirmado.
+                        </div>
+
+                        {import.meta.env.DEV && pix.paymentId && (
                           <button
-                            className="flex-1 rounded-xl border py-2 text-sm"
+                            className="w-full rounded-xl border py-2 text-sm"
                             onClick={async () => {
                               try {
+                                await publicApi.post(
+                                  `/dev/payments/${pix.paymentId}/approve`,
+                                );
                                 const b = await loadBooking(created.id);
                                 setCreated(b);
-                                if (pix.mpPaymentId) {
-                                  const mp = await loadMpPaymentStatus(
-                                    pix.mpPaymentId,
-                                  );
-                                  const mpStatus = mp?.status as
-                                    | string
-                                    | undefined;
-                                  if (mpStatus) {
-                                    setPix((p) =>
-                                      p ? { ...p, status: mpStatus } : p,
-                                    );
-                                  }
-                                }
                               } catch {}
                             }}
                           >
-                            Atualizar
+                            (DEV) Simular aprovação
                           </button>
-                        </div>
+                        )}
                       </div>
+                    </div>
+                  )}
 
-                      <div className="text-xs text-zinc-500">
-                        A tela atualiza automaticamente. Assim que o pagamento
-                        for aprovado, seu agendamento será confirmado.
+                  {expired && (
+                    <div className="rounded-2xl bg-red-50 border border-red-200 p-4">
+                      <h3 className="font-semibold text-red-800">
+                        Reserva expirada
+                      </h3>
+                      <div className="text-sm text-red-800 mt-1">
+                        O prazo para pagamento terminou. Volte e faça um novo
+                        agendamento.
                       </div>
-
-                      {import.meta.env.DEV && pix.paymentId && (
-                        <button
-                          className="w-full rounded-xl border py-2 text-sm"
-                          onClick={async () => {
-                            try {
-                              await publicApi.post(
-                                `/dev/payments/${pix.paymentId}/approve`,
-                              );
-                              const b = await loadBooking(created.id);
-                              setCreated(b);
-                            } catch {}
-                          }}
-                        >
-                          (DEV) Simular aprovação
-                        </button>
-                      )}
                     </div>
-                  </div>
-                )}
-
-                {expired && (
-                  <div className="rounded-2xl bg-red-50 border border-red-200 p-4">
-                    <h3 className="font-semibold text-red-800">
-                      Reserva expirada
-                    </h3>
-                    <div className="text-sm text-red-800 mt-1">
-                      O prazo para pagamento terminou. Volte e faça um novo
-                      agendamento.
-                    </div>
-                  </div>
-                )}
-              </section>
-            )}
-          </>
-        )}
+                  )}
+                </section>
+              )}
+            </>
+          )}
+        </div>
       </div>
     </div>
   );
