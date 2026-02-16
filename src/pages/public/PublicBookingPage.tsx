@@ -352,7 +352,10 @@ export default function PublicBookingPage() {
                         >
                           {services.map((s) => (
                             <option key={s.id} value={s.id}>
-                              {s.name} • {s.durationMinutes}min •{" "}
+                              {s.name} •{" "}
+                              {s.durationMinutes === 0
+                                ? ""
+                                : `${s.durationMinutes}min • `}
                               {formatMoney(s.priceCents)}
                             </option>
                           ))}

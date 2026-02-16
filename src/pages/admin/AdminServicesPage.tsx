@@ -17,6 +17,7 @@ import {
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 
+import { Checkbox } from "@/components/ui/checkbox";
 import { useLoading } from "@/lib/loading";
 import { Pencil, Plus, Power, SlidersHorizontal, X } from "lucide-react";
 
@@ -76,14 +77,16 @@ type ServiceForm = {
   durationMinutes: string;
   priceCents: string;
   signalPercentOverride: string;
+  variableDuration: boolean;
 };
 
 const emptyForm: ServiceForm = {
   name: "",
   durationHours: "0",
-  durationMinutes: "30",
+  durationMinutes: "00",
   priceCents: "0",
   signalPercentOverride: "",
+  variableDuration: false,
 };
 
 function onlyDigits(v: string, maxLen: number) {
@@ -193,6 +196,7 @@ export default function AdminServicesPage() {
       priceCents: String(s.priceCents),
       signalPercentOverride:
         s.signalPercentOverride == null ? "" : String(s.signalPercentOverride),
+      variableDuration: total === 0, // exemplo: 0 = variável
     });
     setOpen(true);
   }
@@ -209,7 +213,7 @@ export default function AdminServicesPage() {
 
     const hours = toInt(form.durationHours);
     const minutes = Number(clampMinute2(form.durationMinutes));
-    const durationMinutes = hours * 60 + minutes;
+    const durationMinutes = form.variableDuration ? 0 : hours * 60 + minutes;
 
     const basePayload = {
       name: form.name.trim(),
@@ -225,20 +229,28 @@ export default function AdminServicesPage() {
 
     try {
       if (!basePayload.name) throw new Error("Informe o nome do serviço.");
-      if (
-        !Number.isFinite(basePayload.durationMinutes) ||
-        basePayload.durationMinutes <= 0
-      ) {
-        throw new Error("Duração inválida.");
+
+      if (!form.variableDuration) {
+        if (
+          !Number.isFinite(basePayload.durationMinutes) ||
+          basePayload.durationMinutes <= 0
+        ) {
+          throw new Error(
+            "Informe uma duração válida ou marque como duração variável.",
+          );
+        }
       }
-      if (!Number.isFinite(basePayload.priceCents) || basePayload.priceCents < 0) {
+
+      if (
+        !Number.isFinite(basePayload.priceCents) ||
+        basePayload.priceCents < 0
+      ) {
         throw new Error("Preço inválido.");
       }
 
       if (editing) {
         await api.patch(`/services/${editing.id}`, basePayload);
       } else {
-        // ✅ revalida na hora da criação e SEMPRE manda "active"
         const ok = await computeHoursReadyNow();
         await api.post(`/services`, {
           ...basePayload,
@@ -333,7 +345,8 @@ export default function AdminServicesPage() {
             <div className="text-sm">
               <div className="font-medium">Horários não configurados</div>
               <div className="text-xs text-muted-foreground">
-                Você só consegue ativar serviços depois de cadastrar o expediente.
+                Você só consegue ativar serviços depois de cadastrar o
+                expediente.
               </div>
             </div>
 
@@ -363,7 +376,9 @@ export default function AdminServicesPage() {
           return (
             <Card
               key={s.id}
-              className={["rounded-2xl", s.active ? "" : "bg-muted/30"].join(" ")}
+              className={["rounded-2xl", s.active ? "" : "bg-muted/30"].join(
+                " ",
+              )}
             >
               <CardContent className="p-4 space-y-3">
                 <div className="flex items-start justify-between gap-3">
@@ -412,10 +427,17 @@ export default function AdminServicesPage() {
 
                   <Button
                     variant={s.active ? "secondary" : "default"}
-                    className={["rounded-xl gap-2", s.active ? "text-rose-700" : ""].join(" ")}
+                    className={[
+                      "rounded-xl gap-2",
+                      s.active ? "text-rose-700" : "",
+                    ].join(" ")}
                     disabled={!s.active && !canActivate} // ✅ trava só na ativação
                     onClick={() => void toggleActive(s)}
-                    title={!s.active && !canActivate ? "Configure horários para ativar" : undefined}
+                    title={
+                      !s.active && !canActivate
+                        ? "Configure horários para ativar"
+                        : undefined
+                    }
                   >
                     <Power className="h-4 w-4" />
                     {s.active ? "Desativar" : "Ativar"}
@@ -502,93 +524,133 @@ export default function AdminServicesPage() {
             <div className="grid gap-1.5">
               <Label>Duração</Label>
 
-              <select
-                className="h-10 rounded-md border bg-background px-3 text-sm"
-                value=""
-                onChange={(e) => {
-                  const v = Number(e.target.value);
-                  if (!Number.isFinite(v)) return;
+              {/* Checkbox primeiro */}
+              <div className="flex items-start gap-3 rounded-lg border bg-muted/40 px-3 py-2 mb-3">
+                <Checkbox
+                  id="variableDuration"
+                  checked={form.variableDuration}
+                  onCheckedChange={(checked) =>
+                    setForm((p) => ({ ...p, variableDuration: !!checked }))
+                  }
+                  className="mt-0.5 h-4 w-4 rounded-md border-muted-foreground/40
+                 data-[state=checked]:bg-emerald-600
+                 data-[state=checked]:border-emerald-600
+                 data-[state=checked]:text-emerald-50
+                 data-[state=indeterminate]:bg-emerald-600"
+                />
 
-                  const hh = Math.floor(v / 60);
-                  const mm = v % 60;
-
-                  setForm((p) => ({
-                    ...p,
-                    durationHours: String(hh),
-                    durationMinutes: pad2(mm),
-                  }));
-
-                  e.currentTarget.value = "";
-                }}
-              >
-                <option value="">Selecionar duração...</option>
-                {durationPresets.map((p) => (
-                  <option key={p.minutes} value={p.minutes}>
-                    {p.label}
-                  </option>
-                ))}
-              </select>
-
-              <div className="flex w-full items-center justify-center gap-3">
-                <div className="grid gap-1 justify-items-center">
-                  <Input
-                    inputMode="numeric"
-                    value={String(Number(form.durationHours || "0"))}
-                    onChange={(e) =>
-                      setForm((p) => ({
-                        ...p,
-                        durationHours: onlyDigits(e.target.value, 4),
-                      }))
-                    }
-                    className="h-16 w-28 rounded-2xl text-center text-4xl font-semibold"
-                    aria-label="Hora"
-                  />
-                  <div className="text-xs text-muted-foreground text-center">
-                    Hora
-                  </div>
-                </div>
-
-                <div className="text-3xl font-semibold text-muted-foreground leading-none">
-                  :
-                </div>
-
-                <div className="grid gap-1 justify-items-center">
-                  <Input
-                    inputMode="numeric"
-                    value={form.durationMinutes}
-                    onChange={(e) =>
-                      setForm((p) => ({
-                        ...p,
-                        durationMinutes: normalizeMinute2(e.target.value),
-                      }))
-                    }
-                    onFocus={(e) => {
-                      requestAnimationFrame(() => {
-                        const len = e.target.value.length;
-                        e.target.setSelectionRange(len, len);
-                      });
-                    }}
-                    onClick={(e) => {
-                      const el = e.currentTarget;
-                      requestAnimationFrame(() => {
-                        const len = el.value.length;
-                        el.setSelectionRange(len, len);
-                      });
-                    }}
-                    onBlur={() =>
-                      setForm((p) => ({
-                        ...p,
-                        durationMinutes: clampMinute2(p.durationMinutes),
-                      }))
-                    }
-                    className="h-16 w-28 rounded-2xl text-center text-4xl font-semibold bg-muted/60"
-                    aria-label="Minuto"
-                  />
-                  <div className="text-xs text-muted-foreground text-center">
-                    Minuto
-                  </div>
-                </div>
+                <label
+                  htmlFor="variableDuration"
+                  className="space-y-0.5 cursor-pointer select-none"
+                >
+                  <div className="text-sm font-medium">Duração variável</div>
+                  <p className="text-[11px] text-muted-foreground leading-snug">
+                    Marque quando o tempo do atendimento pode variar de cliente
+                    para cliente. O sistema não usará um horário fixo na agenda.
+                  </p>
+                </label>
               </div>
+
+              {/* Select e inputs só aparecem se duração FIXA */}
+              {!form.variableDuration && (
+                <div className="space-y-3">
+                  <select
+                    className="w-full h-10 rounded-md border bg-background px-3 py-2 text-sm"
+                    value=""
+                    onChange={(e) => {
+                      const v = Number(e.target.value);
+                      if (!Number.isFinite(v)) return;
+
+                      const hh = Math.floor(v / 60);
+                      const mm = v % 60;
+
+                      setForm((p) => ({
+                        ...p,
+                        variableDuration: false,
+                        durationHours: String(hh),
+                        durationMinutes: pad2(mm),
+                      }));
+
+                      e.currentTarget.value = "";
+                    }}
+                  >
+                    <option value="">Selecionar duração...</option>
+                    {durationPresets.map((p) => (
+                      <option key={p.minutes} value={p.minutes}>
+                        {p.label}
+                      </option>
+                    ))}
+                  </select>
+
+                  <div className="flex w-full items-center justify-center gap-3">
+                    <div className="grid gap-1 justify-items-center">
+                      <Input
+                        inputMode="numeric"
+                        value={String(Number(form.durationHours || "0"))}
+                        onChange={(e) =>
+                          setForm((p) => ({
+                            ...p,
+                            durationHours: onlyDigits(e.target.value, 4),
+                          }))
+                        }
+                        className="h-16 w-28 rounded-2xl text-center text-4xl font-semibold"
+                        aria-label="Hora"
+                      />
+                      <div className="text-xs text-muted-foreground text-center">
+                        Hora
+                      </div>
+                    </div>
+
+                    <div className="text-3xl font-semibold text-muted-foreground leading-none">
+                      :
+                    </div>
+
+                    <div className="grid gap-1 justify-items-center">
+                      <Input
+                        inputMode="numeric"
+                        value={form.durationMinutes}
+                        onChange={(e) =>
+                          setForm((p) => ({
+                            ...p,
+                            durationMinutes: normalizeMinute2(e.target.value),
+                          }))
+                        }
+                        onFocus={(e) => {
+                          requestAnimationFrame(() => {
+                            const len = e.target.value.length;
+                            e.target.setSelectionRange(len, len);
+                          });
+                        }}
+                        onClick={(e) => {
+                          const el = e.currentTarget;
+                          requestAnimationFrame(() => {
+                            const len = el.value.length;
+                            el.setSelectionRange(len, len);
+                          });
+                        }}
+                        onBlur={() =>
+                          setForm((p) => ({
+                            ...p,
+                            durationMinutes: clampMinute2(p.durationMinutes),
+                          }))
+                        }
+                        className="h-16 w-28 rounded-2xl text-center text-4xl font-semibold bg-muted/60"
+                        aria-label="Minuto"
+                      />
+                      <div className="text-xs text-muted-foreground text-center">
+                        Minuto
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              )}
+
+              {form.variableDuration && (
+                <p className="text-[11px] text-muted-foreground mt-1">
+                  A duração deste serviço pode variar de cliente para cliente. O
+                  sistema não usará um tempo fixo ao agendar.
+                </p>
+              )}
             </div>
 
             <div className="grid gap-1.5">
@@ -611,9 +673,16 @@ export default function AdminServicesPage() {
             </div>
 
             <div className="grid gap-1.5">
-              <Label>Sinal (percentual % — opcional)</Label>
+              <Label className="flex flex-col gap-0.5">
+                Adiantamento na reserva (opcional)
+                <span className="text-[11px] font-normal text-muted-foreground">
+                  Informe o percentual cobrado antecipadamente para confirmar o
+                  agendamento. Ex.: 50 = cobra 50% do valor do serviço.
+                </span>
+              </Label>
               <Input
                 inputMode="numeric"
+                placeholder="Percentual em % (ex.: 30)"
                 value={form.signalPercentOverride}
                 onChange={(e) =>
                   setForm((p) => ({
