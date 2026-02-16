@@ -40,7 +40,8 @@ function hasValidBusinessHours(items: BusinessHourItem[]) {
 // --------- links helpers ----------
 function isLinkExpired(l: BookingLink) {
   const anyL = l as any;
-  const expiresAt: string | null | undefined = anyL.expiresAt ?? anyL.expires_at ?? null;
+  const expiresAt: string | null | undefined =
+    anyL.expiresAt ?? anyL.expires_at ?? null;
   if (!expiresAt) return false;
 
   const t = new Date(expiresAt).getTime();
@@ -67,7 +68,10 @@ function getValidGeneralLink(links: BookingLink[]): BookingLink | null {
   return candidates[0] ?? null;
 }
 
-function getValidLinkForService(links: BookingLink[], serviceId: string): BookingLink | null {
+function getValidLinkForService(
+  links: BookingLink[],
+  serviceId: string,
+): BookingLink | null {
   const candidates = (links ?? [])
     .filter((l) => {
       const anyL = l as any;
@@ -104,7 +108,10 @@ export default function AdminDashboardPage() {
     return window.location.origin;
   }, []);
 
-  const hasActiveServices = useMemo(() => services.some((s) => !!s.active), [services]);
+  const hasActiveServices = useMemo(
+    () => services.some((s) => !!s.active),
+    [services],
+  );
 
   const generalLink = useMemo(() => getValidGeneralLink(links), [links]);
 
@@ -113,7 +120,9 @@ export default function AdminDashboardPage() {
   }, [hoursReady, hasActiveServices, generalLink]);
 
   const canReactivateGeneralLink = useMemo(() => {
-    return hoursReady && hasActiveServices && !!generalLink && !generalLink.active;
+    return (
+      hoursReady && hasActiveServices && !!generalLink && !generalLink.active
+    );
   }, [hoursReady, hasActiveServices, generalLink]);
 
   async function load(label = "Carregando painel...") {
@@ -201,7 +210,9 @@ export default function AdminDashboardPage() {
         const existingGeneral = getValidGeneralLink(links);
         if (existingGeneral) {
           if (existingGeneral.active) {
-            setErr("Já existe um link geral válido. Gerencie em “Links Públicos”.");
+            setErr(
+              "Já existe um link geral válido. Gerencie em “Links Públicos”.",
+            );
             return;
           }
           await toggleLink(existingGeneral.id);
@@ -227,7 +238,9 @@ export default function AdminDashboardPage() {
       const existing = getValidLinkForService(links, serviceId);
       if (existing) {
         if (existing.active) {
-          setErr("Esse serviço já possui um link válido. Gerencie em “Links Públicos”.");
+          setErr(
+            "Esse serviço já possui um link válido. Gerencie em “Links Públicos”.",
+          );
           return;
         }
         await toggleLink(existing.id);
@@ -306,24 +319,28 @@ export default function AdminDashboardPage() {
               <div className="min-w-0">
                 <h2 className="text-lg font-semibold">Links Públicos</h2>
                 <p className="text-sm text-muted-foreground">
-                  Gere links gerais ou por serviço e ative/desative quando quiser.
+                  Gere links gerais ou por serviço e ative/desative quando
+                  quiser.
                 </p>
 
                 {!hasActiveServices && (
                   <p className="mt-1 text-xs text-amber-600">
-                    Para gerar/ativar link geral, é necessário ter ao menos 1 serviço ativo.
+                    Para gerar/ativar link geral, é necessário ter ao menos 1
+                    serviço ativo.
                   </p>
                 )}
 
                 {!hoursReady && (
                   <p className="mt-1 text-xs text-amber-600">
-                    Para gerar/ativar links, é necessário configurar um expediente válido.
+                    Para gerar/ativar links, é necessário configurar um
+                    expediente válido.
                   </p>
                 )}
 
                 {generalLink?.active && (
                   <p className="mt-1 text-xs text-muted-foreground">
-                    Link geral já existe (não expirado). Você pode desativar/ativar no card dele abaixo.
+                    Link geral já existe (não expirado). Você pode
+                    desativar/ativar no card dele abaixo.
                   </p>
                 )}
               </div>
@@ -337,10 +354,14 @@ export default function AdminDashboardPage() {
                   void createLink();
                 }}
                 disabled={
-                  generalLink ? !canReactivateGeneralLink : !canCreateGeneralLink
+                  generalLink
+                    ? !canReactivateGeneralLink
+                    : !canCreateGeneralLink
                 }
                 className="rounded-full gap-2 w-full sm:w-auto"
-                variant={generalLink && !generalLink.active ? "default" : "secondary"}
+                variant={
+                  generalLink && !generalLink.active ? "default" : "secondary"
+                }
               >
                 <Plus className="h-4 w-4" />
                 {generalButtonLabel}
@@ -353,7 +374,9 @@ export default function AdminDashboardPage() {
                 const isActive = !!l.active;
                 const isBusy = togglingId === l.id;
 
-                const scopeLabel = l.service ? `Restrito: ${l.service.name}` : "Geral";
+                const scopeLabel = l.service
+                  ? `Restrito: ${l.service.name}`
+                  : "Geral";
 
                 const disableActivate = !hoursReady && !isActive;
 
@@ -365,7 +388,9 @@ export default function AdminDashboardPage() {
                           <div className="text-[11px] uppercase tracking-widest text-muted-foreground">
                             Token
                           </div>
-                          <div className="mt-1 font-mono text-sm truncate">{l.token}</div>
+                          <div className="mt-1 font-mono text-sm truncate">
+                            {l.token}
+                          </div>
 
                           <div className="mt-2 flex flex-wrap items-center gap-2">
                             <Badge variant="secondary" className="rounded-full">
@@ -407,9 +432,13 @@ export default function AdminDashboardPage() {
                         <div className="flex items-center gap-2 shrink-0">
                           <Switch
                             checked={isActive}
-                            disabled={isBusy || disableActivate || isLinkExpired(l)}
+                            disabled={
+                              isBusy || disableActivate || isLinkExpired(l)
+                            }
                             onCheckedChange={() => void toggleLink(l.id)}
-                            aria-label={isActive ? "Desativar link" : "Ativar link"}
+                            aria-label={
+                              isActive ? "Desativar link" : "Ativar link"
+                            }
                             title={
                               isLinkExpired(l)
                                 ? "Link expirado (não reativável)"
@@ -428,7 +457,10 @@ export default function AdminDashboardPage() {
                               <div className="text-[11px] uppercase tracking-widest text-muted-foreground">
                                 URL
                               </div>
-                              <div className="font-mono text-xs break-all sm:truncate" title={url}>
+                              <div
+                                className="font-mono text-xs break-all sm:truncate"
+                                title={url}
+                              >
                                 {url}
                               </div>
                             </div>
@@ -444,7 +476,12 @@ export default function AdminDashboardPage() {
                               <Copy className="h-4 w-4" />
                             </Button>
 
-                            <Button asChild variant="outline" size="icon" className="rounded-xl shrink-0">
+                            <Button
+                              asChild
+                              variant="outline"
+                              size="icon"
+                              className="rounded-xl shrink-0"
+                            >
                               <a
                                 href={url}
                                 target="_blank"
@@ -458,7 +495,9 @@ export default function AdminDashboardPage() {
                           </div>
 
                           {copiedId === l.id && (
-                            <div className="text-xs text-emerald-600">Copiado!</div>
+                            <div className="text-xs text-emerald-600">
+                              Copiado!
+                            </div>
                           )}
                         </>
                       ) : (
@@ -472,7 +511,9 @@ export default function AdminDashboardPage() {
               })}
 
               {links.length === 0 && (
-                <div className="text-sm text-muted-foreground">Nenhum link ainda.</div>
+                <div className="text-sm text-muted-foreground">
+                  Nenhum link ainda.
+                </div>
               )}
             </div>
           </section>
@@ -487,9 +528,13 @@ export default function AdminDashboardPage() {
               {services.map((s) => {
                 const existingLink = getValidLinkForService(links, s.id);
 
-                const canGenerateServiceLink = !!s.active && hoursReady && !existingLink;
+                const canGenerateServiceLink =
+                  !!s.active && hoursReady && !existingLink;
                 const canReactivateServiceLink =
-                  !!s.active && hoursReady && !!existingLink && !existingLink.active;
+                  !!s.active &&
+                  hoursReady &&
+                  !!existingLink &&
+                  !existingLink.active;
 
                 const btnLabel = existingLink
                   ? existingLink.active
@@ -499,14 +544,16 @@ export default function AdminDashboardPage() {
 
                 return (
                   <Card key={s.id} className="w-full rounded-2xl">
-                    <CardContent className="p-4 flex items-start justify-between gap-4">
-                      <div className="min-w-0">
+                    <CardContent className="p-4 flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+                      <div className="min-w-0 flex-1">
                         <div className="font-medium truncate">{s.name}</div>
+
                         <div className="text-sm text-muted-foreground">
-                          {s.durationMinutes}min • R$ {(s.priceCents / 100).toFixed(2)}
+                          {s.durationMinutes}min • R${" "}
+                          {(s.priceCents / 100).toFixed(2)}
                         </div>
 
-                        <div className="mt-2 flex items-center gap-2">
+                        <div className="mt-2 flex flex-wrap items-center gap-2">
                           <Badge
                             variant="secondary"
                             className={[
@@ -545,7 +592,7 @@ export default function AdminDashboardPage() {
                       </div>
 
                       <Button
-                        className="rounded-full shrink-0"
+                        className="rounded-full w-full sm:w-auto sm:shrink-0"
                         onClick={() => {
                           if (existingLink && !existingLink.active) {
                             void toggleLink(existingLink.id);
@@ -554,9 +601,15 @@ export default function AdminDashboardPage() {
                           void createLink(s.id);
                         }}
                         disabled={
-                          existingLink ? !canReactivateServiceLink : !canGenerateServiceLink
+                          existingLink
+                            ? !canReactivateServiceLink
+                            : !canGenerateServiceLink
                         }
-                        variant={existingLink && !existingLink.active ? "default" : "secondary"}
+                        variant={
+                          existingLink && !existingLink.active
+                            ? "default"
+                            : "secondary"
+                        }
                       >
                         {btnLabel}
                       </Button>
