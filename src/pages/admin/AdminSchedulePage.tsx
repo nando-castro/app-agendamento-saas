@@ -63,6 +63,33 @@ function fmtBusinessHourView(h: BusinessHourItem) {
   return `${h.startTime} às ${h.endTime}`;
 }
 
+function normalizeTime(value: string): string | null {
+  // remove espaços
+  const v = value.trim();
+
+  if (!v) return null;
+
+  // aceita "15", "15:", "15:--", "15:0", "15:00" etc.
+  const [hRaw, mRaw = "00"] = v.split(":");
+  const hours = hRaw.replace(/\D/g, "");
+  let minutes = mRaw.replace(/\D/g, "");
+
+  if (hours === "") return null;
+
+  // completa zeros à esquerda
+  const hh = hours.padStart(2, "0").slice(0, 2);
+  if (minutes === "") minutes = "00";
+  const mm = minutes.padStart(2, "0").slice(0, 2);
+
+  const result = `${hh}:${mm}`;
+
+  // valida 24h corretamente
+  const timeRegex = /^([01]\d|2[0-3]):[0-5]\d$/; // 00:00–23:59 [web:24]
+  if (!timeRegex.test(result)) return null;
+
+  return result;
+}
+
 export default function AdminSchedulePage() {
   const nav = useNavigate();
   const { show, hide } = useLoading();
@@ -152,11 +179,25 @@ export default function AdminSchedulePage() {
 
   async function saveHoursFromModal() {
     setErr(null);
+
+    const normalized = hoursDraft.map((h) => {
+      if (!h.active) return h;
+
+      const start = normalizeTime(h.startTime);
+      const end = normalizeTime(h.endTime);
+
+      if (!start || !end) {
+        throw new Error(`Horário inválido em ${weekdayLabel[h.weekday]}`);
+      }
+
+      return { ...h, startTime: start, endTime: end };
+    });
+
     setSavingHours(true);
     show("Salvando expediente...");
 
     try {
-      await scheduleService.editarHorarios({ items: hoursDraft });
+      await scheduleService.editarHorarios({ items: normalized });
       setHoursOpen(false);
       await loadAll({ showLoader: false });
     } catch (e: unknown) {
@@ -453,30 +494,52 @@ export default function AdminSchedulePage() {
           if (!v) setErr(null);
         }}
       >
-        <DialogContent className="sm:max-w-lg">
+        <DialogContent className="sm:max-w-2xl">
           <DialogHeader>
             <DialogTitle>
               {hoursConfigured ? "Editar expediente" : "Configurar expediente"}
             </DialogTitle>
           </DialogHeader>
 
+          {/* aviso geral */}
+          <div className="mb-2 rounded-lg border border-amber-300/60 bg-amber-50 px-3 py-2 text-xs text-amber-900">
+            Desativar um dia faz com que ele fique fechado para novos
+            agendamentos. Agendamentos já existentes não são alterados.
+          </div>
+
           <div className="space-y-3 max-h-[65vh] overflow-auto pr-1">
             {hoursDraft.map((h, idx) => (
               <Card key={h.weekday} className="rounded-2xl">
                 <CardContent className="p-4 space-y-3">
-                  <div className="flex items-center justify-between">
-                    <div className="font-medium">{weekdayLabel[h.weekday]}</div>
+                  <div className="flex items-center justify-between gap-3">
+                    <div className="flex flex-col">
+                      <div className="font-medium">
+                        {weekdayLabel[h.weekday]}
+                      </div>
+                    </div>
 
-                    <Switch
-                      checked={h.active}
-                      onCheckedChange={(active) =>
-                        setHoursDraft((p) =>
-                          p.map((x, i) => (i === idx ? { ...x, active } : x)),
-                        )
-                      }
-                      aria-label={`Ativar ${weekdayLabel[h.weekday]}`}
-                    />
+                    <div className="flex items-center gap-2">
+                      <span className="text-xs text-muted-foreground">
+                        {h.active ? "Dia ativo" : "Dia fechado"}
+                      </span>
+                      <Switch
+                        checked={h.active}
+                        onCheckedChange={(active) =>
+                          setHoursDraft((p) =>
+                            p.map((x, i) => (i === idx ? { ...x, active } : x)),
+                          )
+                        }
+                        aria-label={`Dia ativo: ${weekdayLabel[h.weekday]}`}
+                      />
+                    </div>
                   </div>
+
+                  {/* aviso específico quando o dia está desativado */}
+                  {!h.active && (
+                    <p className="text-[11px] text-muted-foreground">
+                      Este dia ficará fechado e não aceitará novos agendamentos.
+                    </p>
+                  )}
 
                   <div className="grid grid-cols-2 gap-3">
                     <div className="grid gap-1.5">
@@ -484,19 +547,18 @@ export default function AdminSchedulePage() {
                         Início
                       </Label>
                       <Input
+                        type="time"
                         value={h.startTime}
                         disabled={!h.active}
-                        onChange={(e) =>
+                        onChange={(e) => {
+                          const normalized =
+                            normalizeTime(e.target.value) ?? h.startTime;
                           setHoursDraft((p) =>
                             p.map((x, i) =>
-                              i === idx
-                                ? { ...x, startTime: e.target.value }
-                                : x,
+                              i === idx ? { ...x, startTime: normalized } : x,
                             ),
-                          )
-                        }
-                        placeholder="09:00"
-                        inputMode="numeric"
+                          );
+                        }}
                       />
                     </div>
 
@@ -505,17 +567,18 @@ export default function AdminSchedulePage() {
                         Fim
                       </Label>
                       <Input
+                        type="time"
                         value={h.endTime}
                         disabled={!h.active}
-                        onChange={(e) =>
+                        onChange={(e) => {
+                          const normalized =
+                            normalizeTime(e.target.value) ?? h.endTime;
                           setHoursDraft((p) =>
                             p.map((x, i) =>
-                              i === idx ? { ...x, endTime: e.target.value } : x,
+                              i === idx ? { ...x, endTime: normalized } : x,
                             ),
-                          )
-                        }
-                        placeholder="18:00"
-                        inputMode="numeric"
+                          );
+                        }}
                       />
                     </div>
                   </div>
