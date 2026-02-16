@@ -1,5 +1,5 @@
 import { getErrorMessage } from "@/lib/getErrorMessage";
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { useNavigate } from "react-router-dom";
 
 import { Badge } from "@/components/ui/badge";
@@ -124,6 +124,7 @@ export default function AdminSchedulePage() {
     endAt: "", // datetime-local
     reason: "",
   });
+  const [blockError, setBlockError] = useState<string | null>(null);
 
   // ✅ padrão: tudo DESATIVADO
   const defaultHours = useMemo<BusinessHourItem[]>(
@@ -136,6 +137,34 @@ export default function AdminSchedulePage() {
       })),
     [],
   );
+
+  const startAtRef = useRef<HTMLInputElement | null>(null);
+  const endAtRef = useRef<HTMLInputElement | null>(null);
+
+  function clearBlockForm() {
+    setErr(null);
+    setBlockError(null);
+    setBlockForm({ startAt: "", endAt: "", reason: "" });
+    startAtRef.current?.setCustomValidity("");
+    endAtRef.current?.setCustomValidity("");
+  }
+
+  const blockRangeError = useMemo(
+    () => validateBlockForm(blockForm.startAt, blockForm.endAt),
+    [blockForm.startAt, blockForm.endAt],
+  );
+
+  useEffect(() => {
+    // mostra erro de forma bem evidente (nativo do browser) quando tiver range inválido
+    const msg = blockRangeError ?? "";
+    if (startAtRef.current) startAtRef.current.setCustomValidity("");
+    if (endAtRef.current) endAtRef.current.setCustomValidity(msg);
+
+    // se já preencheu ambos e ficou inválido, dispara o “balãozinho” do navegador
+    if (msg && blockForm.startAt && blockForm.endAt) {
+      endAtRef.current?.reportValidity();
+    }
+  }, [blockRangeError, blockForm.startAt, blockForm.endAt]);
 
   async function loadAll(opts?: { showLoader?: boolean; label?: string }) {
     const showLoader = opts?.showLoader ?? true;
@@ -208,6 +237,28 @@ export default function AdminSchedulePage() {
     }
   }
 
+  function isValidDate(d: Date) {
+    return !Number.isNaN(d.getTime());
+  }
+
+  function validateBlockForm(startAt: string, endAt: string): string | null {
+    if (!startAt || !endAt) return null;
+
+    const s = new Date(startAt);
+    const e = new Date(endAt);
+
+    if (!isValidDate(s) || !isValidDate(e))
+      return "Datas inválidas. Use o seletor.";
+    if (e <= s) return "O fim deve ser maior que o início.";
+    return null;
+  }
+
+  const maxDate = useMemo(() => {
+    const max = new Date();
+    max.setDate(max.getDate() + 30); // 30 dias
+    return max.toISOString().slice(0, 16); // YYYY-MM-DDTHH:mm formato datetime-local
+  }, []);
+
   async function createBlock() {
     setErr(null);
     show("Criando bloqueio...");
@@ -217,8 +268,25 @@ export default function AdminSchedulePage() {
         throw new Error("Informe início e fim.");
       }
 
-      const startIso = new Date(blockForm.startAt).toISOString();
-      const endIso = new Date(blockForm.endAt).toISOString();
+      const startDate = new Date(blockForm.startAt);
+      const endDate = new Date(blockForm.endAt);
+
+      const rangeMsg = validateBlockForm(blockForm.startAt, blockForm.endAt);
+      if (rangeMsg) throw new Error(rangeMsg);
+
+      // ✅ validação explícita
+      if (isNaN(startDate.getTime()) || isNaN(endDate.getTime())) {
+        throw new Error("Datas inválidas. Use o seletor de data/hora.");
+      }
+      if (endDate <= startDate) {
+        throw new Error("Fim deve ser depois do início.");
+      }
+      if (endDate.getTime() - startDate.getTime() > 7 * 24 * 60 * 60 * 1000) {
+        throw new Error("Bloqueio máximo de 7 dias.");
+      }
+
+      const startIso = startDate.toISOString();
+      const endIso = endDate.toISOString();
 
       await scheduleService.criarBloqueios({
         startAt: startIso,
@@ -228,7 +296,6 @@ export default function AdminSchedulePage() {
 
       setOpenBlock(false);
       setBlockForm({ startAt: "", endAt: "", reason: "" });
-
       await loadAll({ showLoader: false });
     } catch (e: unknown) {
       setErr(getErrorMessage(e));
@@ -543,42 +610,30 @@ export default function AdminSchedulePage() {
 
                   <div className="grid grid-cols-2 gap-3">
                     <div className="grid gap-1.5">
-                      <Label className="text-[11px] uppercase tracking-widest text-muted-foreground">
-                        Início
-                      </Label>
+                      <Label>Início</Label>
                       <Input
-                        type="time"
-                        value={h.startTime}
-                        disabled={!h.active}
-                        onChange={(e) => {
-                          const normalized =
-                            normalizeTime(e.target.value) ?? h.startTime;
-                          setHoursDraft((p) =>
-                            p.map((x, i) =>
-                              i === idx ? { ...x, startTime: normalized } : x,
-                            ),
-                          );
-                        }}
+                        type="datetime-local"
+                        value={blockForm.startAt}
+                        max={maxDate} // ✅ limite
+                        onChange={(e) =>
+                          setBlockForm((p) => ({
+                            ...p,
+                            startAt: e.target.value,
+                          }))
+                        }
                       />
                     </div>
 
                     <div className="grid gap-1.5">
-                      <Label className="text-[11px] uppercase tracking-widest text-muted-foreground">
-                        Fim
-                      </Label>
+                      <Label>Fim</Label>
                       <Input
-                        type="time"
-                        value={h.endTime}
-                        disabled={!h.active}
-                        onChange={(e) => {
-                          const normalized =
-                            normalizeTime(e.target.value) ?? h.endTime;
-                          setHoursDraft((p) =>
-                            p.map((x, i) =>
-                              i === idx ? { ...x, endTime: normalized } : x,
-                            ),
-                          );
-                        }}
+                        type="datetime-local"
+                        value={blockForm.endAt}
+                        min={blockForm.startAt} // ✅ não antes do início
+                        max={maxDate}
+                        onChange={(e) =>
+                          setBlockForm((p) => ({ ...p, endAt: e.target.value }))
+                        }
                       />
                     </div>
                   </div>
@@ -614,27 +669,57 @@ export default function AdminSchedulePage() {
             <DialogTitle>Novo bloqueio</DialogTitle>
           </DialogHeader>
 
+          {blockRangeError && (
+            <Card className="border-destructive/40 bg-destructive/5">
+              <CardContent className="pt-4 text-sm text-destructive">
+                {blockRangeError}
+              </CardContent>
+            </Card>
+          )}
+
           <div className="grid gap-3">
             <div className="grid gap-1.5">
               <Label>Início</Label>
               <Input
+                ref={startAtRef}
                 type="datetime-local"
                 value={blockForm.startAt}
-                onChange={(e) =>
-                  setBlockForm((p) => ({ ...p, startAt: e.target.value }))
+                max={maxDate}
+                aria-invalid={!!blockRangeError}
+                className={
+                  blockRangeError
+                    ? "border-destructive focus-visible:ring-destructive"
+                    : ""
                 }
+                onChange={(e) => {
+                  setBlockError(null);
+                  setBlockForm((p) => ({ ...p, startAt: e.target.value }));
+                }}
               />
             </div>
 
             <div className="grid gap-1.5">
               <Label>Fim</Label>
               <Input
+                ref={endAtRef}
                 type="datetime-local"
                 value={blockForm.endAt}
-                onChange={(e) =>
-                  setBlockForm((p) => ({ ...p, endAt: e.target.value }))
+                min={blockForm.startAt || undefined} // ajuda a prevenir
+                max={maxDate}
+                aria-invalid={!!blockRangeError}
+                className={
+                  blockRangeError
+                    ? "border-destructive focus-visible:ring-destructive"
+                    : ""
                 }
+                onChange={(e) => {
+                  setBlockError(null);
+                  setBlockForm((p) => ({ ...p, endAt: e.target.value }));
+                }}
               />
+              {blockRangeError && (
+                <p className="text-xs text-destructive">{blockRangeError}</p>
+              )}
             </div>
 
             <div className="grid gap-1.5">
@@ -649,11 +734,34 @@ export default function AdminSchedulePage() {
             </div>
           </div>
 
-          <DialogFooter>
-            <Button variant="outline" onClick={() => setOpenBlock(false)}>
-              Cancelar
+          <DialogFooter className="flex items-center justify-between gap-2">
+            <Button
+              type="button"
+              variant="outline"
+              onClick={clearBlockForm} // ✅ limpa datas
+            >
+              Limpar
             </Button>
-            <Button onClick={() => void createBlock()}>Criar</Button>
+
+            <div className="flex gap-2">
+              <Button
+                type="button"
+                variant="outline"
+                onClick={() => setOpenBlock(false)}
+              >
+                Cancelar
+              </Button>
+              <Button
+                type="button"
+                onClick={() => void createBlock()}
+                disabled={
+                  !blockForm.startAt || !blockForm.endAt || !!blockRangeError
+                }
+                title={blockRangeError ?? undefined}
+              >
+                Criar
+              </Button>
+            </div>
           </DialogFooter>
         </DialogContent>
       </Dialog>
