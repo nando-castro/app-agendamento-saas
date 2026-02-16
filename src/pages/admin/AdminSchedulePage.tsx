@@ -124,7 +124,7 @@ export default function AdminSchedulePage() {
     endAt: "", // datetime-local
     reason: "",
   });
-  const [blockError, setBlockError] = useState<string | null>(null);
+  // const [blockError, setBlockError] = useState<string | null>(null);
 
   // ✅ padrão: tudo DESATIVADO
   const defaultHours = useMemo<BusinessHourItem[]>(
@@ -143,7 +143,7 @@ export default function AdminSchedulePage() {
 
   function clearBlockForm() {
     setErr(null);
-    setBlockError(null);
+    // setBlockError(null);
     setBlockForm({ startAt: "", endAt: "", reason: "" });
     startAtRef.current?.setCustomValidity("");
     endAtRef.current?.setCustomValidity("");
@@ -692,7 +692,7 @@ export default function AdminSchedulePage() {
                     : ""
                 }
                 onChange={(e) => {
-                  setBlockError(null);
+                  // setBlockError(null);
                   setBlockForm((p) => ({ ...p, startAt: e.target.value }));
                 }}
               />
@@ -713,7 +713,7 @@ export default function AdminSchedulePage() {
                     : ""
                 }
                 onChange={(e) => {
-                  setBlockError(null);
+                  // setBlockError(null);
                   setBlockForm((p) => ({ ...p, endAt: e.target.value }));
                 }}
               />
