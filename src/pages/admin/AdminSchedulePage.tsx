@@ -1,3 +1,13 @@
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
 import { getErrorMessage } from "@/lib/getErrorMessage";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { useNavigate } from "react-router-dom";
@@ -111,6 +121,16 @@ export default function AdminSchedulePage() {
       to: to.toISOString().slice(0, 10),
     };
   });
+
+  const [confirmDeleteOpen, setConfirmDeleteOpen] = useState(false);
+  const [deleting, setDeleting] = useState(false);
+  const [blockToDelete, setBlockToDelete] = useState<Block | null>(null);
+
+  function askDeleteBlock(b: Block) {
+    setErr(null);
+    setBlockToDelete(b);
+    setConfirmDeleteOpen(true);
+  }
 
   // -------- modal EXPEDIENTE --------
   const [hoursOpen, setHoursOpen] = useState(false);
@@ -304,17 +324,23 @@ export default function AdminSchedulePage() {
     }
   }
 
-  async function deleteBlock(id: string) {
+  async function confirmDeleteBlock() {
+    if (!blockToDelete) return;
+
     setErr(null);
+    setDeleting(true);
     show("Removendo bloqueio...");
 
     try {
-      await scheduleService.deletarBloqueio(id);
+      await scheduleService.deletarBloqueio(blockToDelete.id);
+      setConfirmDeleteOpen(false);
+      setBlockToDelete(null);
       await loadAll({ showLoader: false });
     } catch (e: unknown) {
       setErr(getErrorMessage(e));
     } finally {
       hide();
+      setDeleting(false);
     }
   }
 
@@ -539,7 +565,7 @@ export default function AdminSchedulePage() {
                       variant="ghost"
                       size="icon"
                       className="rounded-xl shrink-0 text-muted-foreground hover:text-foreground"
-                      onClick={() => void deleteBlock(b.id)}
+                      onClick={() => askDeleteBlock(b)}
                       aria-label="Remover bloqueio"
                       title="Remover"
                     >
@@ -765,6 +791,34 @@ export default function AdminSchedulePage() {
           </DialogFooter>
         </DialogContent>
       </Dialog>
+
+      <AlertDialog open={confirmDeleteOpen} onOpenChange={setConfirmDeleteOpen}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Remover bloqueio?</AlertDialogTitle>
+            <AlertDialogDescription>
+              Esta ação não pode ser desfeita.
+              {blockToDelete
+                ? ` Você está removendo: ${fmtBlockRange(blockToDelete)}.`
+                : ""}
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+
+          <AlertDialogFooter>
+            <AlertDialogCancel disabled={deleting}>Cancelar</AlertDialogCancel>
+            <AlertDialogAction
+              onClick={(e) => {
+                e.preventDefault(); // mantém o dialog aberto enquanto executa
+                void confirmDeleteBlock();
+              }}
+              disabled={deleting}
+              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+            >
+              {deleting ? "Removendo..." : "Remover"}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   );
 }
