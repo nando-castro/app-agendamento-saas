@@ -1,6 +1,6 @@
 import authService from "@/gateway/services/authService";
 import { useLoading } from "@/lib/loading";
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import { setAdminToken } from "../../lib/storage";
 
@@ -75,19 +75,35 @@ function isValidEmail(v: string) {
 
 function isValidSlug(v: string) {
   // letras minúsculas, números e hífen, sem espaços; 3..32 chars
-  return /^[a-z0-9]+(?:-[a-z0-9]+)*$/.test(v) && v.length >= 3 && v.length <= 32;
+  return (
+    /^[a-z0-9]+(?:-[a-z0-9]+)*$/.test(v) && v.length >= 3 && v.length <= 32
+  );
 }
 
-function slugify(input: string) {
-  // básico (sem dependência) pra virar "studio-bela"
+function slugifyCore(input: string) {
   return input
     .normalize("NFD")
     .replace(/[\u0300-\u036f]/g, "")
     .toLowerCase()
-    .trim()
-    .replace(/[^a-z0-9\s-]/g, "")
-    .replace(/\s+/g, "-")
-    .replace(/-+/g, "-");
+    .replace(/[^a-z0-9\s-]/g, "") // só [a-z0-9 espaço -]
+    .replace(/\s+/g, "-") // espaço -> hífen
+    .replace(/-+/g, "-"); // colapsa hífens
+}
+
+// para auto-preencher a partir do nome (sem hífen no final)
+function slugifyAuto(input: string) {
+  return slugifyCore(input).trim().replace(/^-+/, "").replace(/-+$/, "");
+}
+
+// para quando o usuário está digitando no campo slug (permite hífen no final durante digitação)
+function slugifyTyping(input: string) {
+  // NÃO remove o - no final aqui
+  return slugifyCore(input).trim().replace(/^-+/, "");
+}
+
+// normalização final (antes de validar/enviar)
+function slugifyFinal(input: string) {
+  return slugifyCore(input).trim().replace(/^-+/, "").replace(/-+$/, "");
 }
 
 export default function AdminRegisterPage() {
@@ -122,53 +138,62 @@ export default function AdminRegisterPage() {
   // mantém só pra desabilitar botão/label
   const [loading, setLoading] = useState(false);
 
+  const [slugDirty, setSlugDirty] = useState(false);
+
   function set<K extends keyof FormState>(k: K, v: string) {
     setForm((p) => ({ ...p, [k]: v }));
   }
 
   const normalized = useMemo(() => {
     const tenantName = form.tenantName.trim();
-    const tenantSlug = form.tenantSlug.trim().toLowerCase();
+    const tenantSlug = slugifyFinal(form.tenantSlug);
     const adminName = form.adminName.trim();
     const adminEmail = form.adminEmail.trim();
     const adminPassword = form.adminPassword;
     const adminPasswordConfirm = form.adminPasswordConfirm;
 
-    return { tenantName, tenantSlug, adminName, adminEmail, adminPassword, adminPasswordConfirm };
+    return {
+      tenantName,
+      tenantSlug,
+      adminName,
+      adminEmail,
+      adminPassword,
+      adminPasswordConfirm,
+    };
   }, [form]);
 
   const fieldErrors = useMemo(() => {
-    const tenantNameError = !normalized.tenantName ? "Informe o nome do negócio." : null;
+    const tenantNameError = !normalized.tenantName
+      ? "Informe o nome do negócio."
+      : null;
 
-    const tenantSlugError =
-      !normalized.tenantSlug
-        ? "Informe o nome de usuário (slug)."
-        : !isValidSlug(normalized.tenantSlug)
-          ? "Use apenas letras minúsculas, números e hífen (ex: studio-bela)."
-          : null;
+    const tenantSlugError = !normalized.tenantSlug
+      ? "Informe como ficará o final da URL da página (slug)."
+      : !isValidSlug(normalized.tenantSlug)
+        ? "Use apenas letras minúsculas, números e hífen (ex: studio-bela)."
+        : null;
 
-    const adminNameError = !normalized.adminName ? "Informe o nome do administrador." : null;
+    const adminNameError = !normalized.adminName
+      ? "Informe o nome do administrador."
+      : null;
 
-    const adminEmailError =
-      !normalized.adminEmail
-        ? "Informe o e-mail do administrador."
-        : !isValidEmail(normalized.adminEmail)
-          ? "E-mail inválido."
-          : null;
+    const adminEmailError = !normalized.adminEmail
+      ? "Informe o e-mail do administrador."
+      : !isValidEmail(normalized.adminEmail)
+        ? "E-mail inválido."
+        : null;
 
-    const adminPasswordError =
-      !normalized.adminPassword
-        ? "Informe a senha."
-        : normalized.adminPassword.length < 6
-          ? "Senha muito curta (mínimo 6 caracteres)."
-          : null;
+    const adminPasswordError = !normalized.adminPassword
+      ? "Informe a senha."
+      : normalized.adminPassword.length < 6
+        ? "Senha muito curta (mínimo 6 caracteres)."
+        : null;
 
-    const adminPasswordConfirmError =
-      !normalized.adminPasswordConfirm
-        ? "Confirme a senha."
-        : normalized.adminPasswordConfirm !== normalized.adminPassword
-          ? "As senhas não conferem."
-          : null;
+    const adminPasswordConfirmError = !normalized.adminPasswordConfirm
+      ? "Confirme a senha."
+      : normalized.adminPasswordConfirm !== normalized.adminPassword
+        ? "As senhas não conferem."
+        : null;
 
     return {
       tenantNameError,
@@ -239,6 +264,29 @@ export default function AdminRegisterPage() {
     }
   }
 
+  useEffect(() => {
+    if (slugDirty) return;
+
+    const next = slugifyAuto(form.tenantName);
+    setForm((p) => ({ ...p, tenantSlug: next }));
+  }, [form.tenantName, slugDirty]);
+
+  function makeSlugSuggestions(tenantName: string): string[] {
+    const base = slugifyAuto(tenantName);
+    if (!base) return [];
+    return Array.from(new Set([base, `${base}-oficial`, `${base}-br`])).slice(
+      0,
+      3,
+    );
+  }
+
+  const slugSuggestions = useMemo(() => {
+    // Só mostra sugestões se tiver nome do negócio e o usuário ainda não “travou” o slug manualmente
+    if (!normalized.tenantName) return [];
+    if (slugDirty) return [];
+    return makeSlugSuggestions(normalized.tenantName);
+  }, [normalized.tenantName, slugDirty]);
+
   return (
     <div className="min-h-screen grid place-items-center p-4">
       <div className="w-full max-w-md rounded-2xl bg-white shadow p-6">
@@ -248,11 +296,11 @@ export default function AdminRegisterPage() {
           {(
             [
               ["tenantName", "Nome do negócio (ex: Studio Bela)"],
-              ["tenantSlug", "Nome de usuário (ex: studio-bela)"],
+              ["tenantSlug", "Final da URL da Página do Negócio (ex: studio-bela)"],
               ["adminName", "Nome do administrador"],
               ["adminEmail", "E-mail do administrador"],
               ["adminPassword", "Senha do administrador"],
-              ["adminPasswordConfirm", "Confirmar senha do administrador"], // NOVO
+              ["adminPasswordConfirm", "Confirmar senha do administrador"],
             ] as const
           ).map(([k, label]) => {
             const errorText =
@@ -271,7 +319,9 @@ export default function AdminRegisterPage() {
             const showFieldError = touched[k] ? errorText : null;
             const inputBase =
               "w-full rounded-xl border px-3 py-2 outline-none " +
-              (showFieldError ? "border-red-500 ring-2 ring-red-100" : "focus:ring-2 focus:ring-zinc-200");
+              (showFieldError
+                ? "border-red-500 ring-2 ring-red-100"
+                : "focus:ring-2 focus:ring-zinc-200");
 
             const isPassword = k === "adminPassword";
             const isPasswordConfirm = k === "adminPasswordConfirm";
@@ -299,7 +349,9 @@ export default function AdminRegisterPage() {
                             ? "text"
                             : "password"
                       }
-                      autoComplete={isPassword ? "new-password" : "new-password"}
+                      autoComplete={
+                        isPassword ? "new-password" : "new-password"
+                      }
                       aria-invalid={!!showFieldError}
                       aria-describedby={`${k}-error`}
                     />
@@ -311,9 +363,15 @@ export default function AdminRegisterPage() {
                       }}
                       className="absolute right-2 top-1/2 -translate-y-1/2 grid h-9 w-9 place-items-center rounded-lg text-zinc-700 hover:bg-zinc-100"
                       aria-label={
-                        (isPassword ? showPassword : showPasswordConfirm) ? "Ocultar senha" : "Mostrar senha"
+                        (isPassword ? showPassword : showPasswordConfirm)
+                          ? "Ocultar senha"
+                          : "Mostrar senha"
                       }
-                      title={(isPassword ? showPassword : showPasswordConfirm) ? "Ocultar" : "Mostrar"}
+                      title={
+                        (isPassword ? showPassword : showPasswordConfirm)
+                          ? "Ocultar"
+                          : "Mostrar"
+                      }
                     >
                       {(isPassword ? showPassword : showPasswordConfirm) ? (
                         <EyeOffIcon className="h-5 w-5" />
@@ -340,17 +398,20 @@ export default function AdminRegisterPage() {
                 ) : k === "tenantSlug" ? (
                   <input
                     className={"mt-1 " + inputBase}
-                    value={form[k]}
+                    value={form.tenantSlug}
                     onChange={(e) => {
-                      const raw = e.target.value;
-                      set(k, slugify(raw));
+                      setSlugDirty(true);
+                      set("tenantSlug", slugifyTyping(e.target.value)); // permite "-" no final enquanto digita
                       setErr(null);
                     }}
-                    onBlur={() => setTouched((t) => ({ ...t, [k]: true }))}
+                    onBlur={() => {
+                      setTouched((t) => ({ ...t, tenantSlug: true }));
+                      set("tenantSlug", slugifyFinal(form.tenantSlug)); // remove "-" no final quando sair do campo
+                    }}
                     type="text"
                     autoComplete="username"
                     aria-invalid={!!showFieldError}
-                    aria-describedby={`${k}-error`}
+                    aria-describedby={`tenantSlug-error`}
                   />
                 ) : (
                   <input
@@ -367,6 +428,26 @@ export default function AdminRegisterPage() {
                   />
                 )}
 
+                {k === "tenantSlug" && slugSuggestions.length >= 3 && (
+                  <div className="mt-2 flex flex-wrap gap-2">
+                    {slugSuggestions.map((sug) => (
+                      <button
+                        key={sug}
+                        type="button"
+                        className="rounded-full border px-3 py-1 text-xs text-zinc-700 hover:bg-zinc-50"
+                        onClick={() => {
+                          set("tenantSlug", sug);
+                          setSlugDirty(true); // escolheu manualmente
+                          setTouched((t) => ({ ...t, tenantSlug: true }));
+                        }}
+                        title="Usar sugestão"
+                      >
+                        {sug}
+                      </button>
+                    ))}
+                  </div>
+                )}
+
                 {showFieldError && (
                   <div id={`${k}-error`} className="mt-1 text-xs text-red-600">
                     {showFieldError}
@@ -375,7 +456,8 @@ export default function AdminRegisterPage() {
 
                 {k === "tenantSlug" && !touched.tenantSlug && (
                   <div className="mt-1 text-xs text-zinc-500">
-                    Dica: use letras minúsculas e hífen. Ex: <span className="font-mono">studio-bela</span>
+                    Dica: use letras minúsculas e hífen. Ex:{" "}
+                    <span className="font-mono">studio-bela</span>
                   </div>
                 )}
               </div>
