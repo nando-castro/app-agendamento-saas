@@ -289,197 +289,205 @@ export default function AdminRegisterPage() {
 
   return (
     <div className="h-dvh overflow-y-auto p-4 sm:min-h-screen sm:grid sm:place-items-center sm:overflow-visible">
-    <div className="w-full max-w-md rounded-2xl bg-white shadow p-6">
-        <h1 className="text-xl font-semibold">Criar conta</h1>
+      <div className="min-h-full flex sm:block">
+        <div className="w-full max-w-md mx-auto my-auto rounded-2xl bg-white shadow p-6">
+          <h1 className="text-xl font-semibold">Criar conta</h1>
 
-        <form onSubmit={onSubmit} className="mt-4 space-y-3" noValidate>
-          {(
-            [
-              ["tenantName", "Nome do negócio (ex: Studio Bela)"],
-              ["tenantSlug", "Final da URL da Página do Negócio (ex: studio-bela)"],
-              ["adminName", "Nome do administrador"],
-              ["adminEmail", "E-mail do administrador"],
-              ["adminPassword", "Senha do administrador"],
-              ["adminPasswordConfirm", "Confirmar senha do administrador"],
-            ] as const
-          ).map(([k, label]) => {
-            const errorText =
-              k === "tenantName"
-                ? fieldErrors.tenantNameError
-                : k === "tenantSlug"
-                  ? fieldErrors.tenantSlugError
-                  : k === "adminName"
-                    ? fieldErrors.adminNameError
-                    : k === "adminEmail"
-                      ? fieldErrors.adminEmailError
-                      : k === "adminPassword"
-                        ? fieldErrors.adminPasswordError
-                        : fieldErrors.adminPasswordConfirmError;
+          <form onSubmit={onSubmit} className="mt-4 space-y-3" noValidate>
+            {(
+              [
+                ["tenantName", "Nome do negócio (ex: Studio Bela)"],
+                [
+                  "tenantSlug",
+                  "Final da URL da Página do Negócio (ex: studio-bela)",
+                ],
+                ["adminName", "Nome do administrador"],
+                ["adminEmail", "E-mail do administrador"],
+                ["adminPassword", "Senha do administrador"],
+                ["adminPasswordConfirm", "Confirmar senha do administrador"],
+              ] as const
+            ).map(([k, label]) => {
+              const errorText =
+                k === "tenantName"
+                  ? fieldErrors.tenantNameError
+                  : k === "tenantSlug"
+                    ? fieldErrors.tenantSlugError
+                    : k === "adminName"
+                      ? fieldErrors.adminNameError
+                      : k === "adminEmail"
+                        ? fieldErrors.adminEmailError
+                        : k === "adminPassword"
+                          ? fieldErrors.adminPasswordError
+                          : fieldErrors.adminPasswordConfirmError;
 
-            const showFieldError = touched[k] ? errorText : null;
-            const inputBase =
-              "w-full rounded-xl border px-3 py-2 outline-none " +
-              (showFieldError
-                ? "border-red-500 ring-2 ring-red-100"
-                : "focus:ring-2 focus:ring-zinc-200");
+              const showFieldError = touched[k] ? errorText : null;
+              const inputBase =
+                "w-full rounded-xl border px-3 py-2 outline-none " +
+                (showFieldError
+                  ? "border-red-500 ring-2 ring-red-100"
+                  : "focus:ring-2 focus:ring-zinc-200");
 
-            const isPassword = k === "adminPassword";
-            const isPasswordConfirm = k === "adminPasswordConfirm";
+              const isPassword = k === "adminPassword";
+              const isPasswordConfirm = k === "adminPasswordConfirm";
 
-            return (
-              <div key={k}>
-                <label className="text-sm">{label}</label>
+              return (
+                <div key={k}>
+                  <label className="text-sm">{label}</label>
 
-                {isPassword || isPasswordConfirm ? (
-                  <div className="mt-1 relative">
+                  {isPassword || isPasswordConfirm ? (
+                    <div className="mt-1 relative">
+                      <input
+                        className={inputBase + " pr-11"}
+                        value={form[k]}
+                        onChange={(e) => {
+                          set(k, e.target.value);
+                          setErr(null);
+                        }}
+                        onBlur={() => setTouched((t) => ({ ...t, [k]: true }))}
+                        type={
+                          isPassword
+                            ? showPassword
+                              ? "text"
+                              : "password"
+                            : showPasswordConfirm
+                              ? "text"
+                              : "password"
+                        }
+                        autoComplete={
+                          isPassword ? "new-password" : "new-password"
+                        }
+                        aria-invalid={!!showFieldError}
+                        aria-describedby={`${k}-error`}
+                      />
+                      <button
+                        type="button"
+                        onClick={() => {
+                          if (isPassword) setShowPassword((s) => !s);
+                          else setShowPasswordConfirm((s) => !s);
+                        }}
+                        className="absolute right-2 top-1/2 -translate-y-1/2 grid h-9 w-9 place-items-center rounded-lg text-zinc-700 hover:bg-zinc-100"
+                        aria-label={
+                          (isPassword ? showPassword : showPasswordConfirm)
+                            ? "Ocultar senha"
+                            : "Mostrar senha"
+                        }
+                        title={
+                          (isPassword ? showPassword : showPasswordConfirm)
+                            ? "Ocultar"
+                            : "Mostrar"
+                        }
+                      >
+                        {(isPassword ? showPassword : showPasswordConfirm) ? (
+                          <EyeOffIcon className="h-5 w-5" />
+                        ) : (
+                          <EyeIcon className="h-5 w-5" />
+                        )}
+                      </button>
+                    </div>
+                  ) : k === "adminEmail" ? (
                     <input
-                      className={inputBase + " pr-11"}
+                      className={"mt-1 " + inputBase}
                       value={form[k]}
                       onChange={(e) => {
                         set(k, e.target.value);
                         setErr(null);
                       }}
                       onBlur={() => setTouched((t) => ({ ...t, [k]: true }))}
-                      type={
-                        isPassword
-                          ? showPassword
-                            ? "text"
-                            : "password"
-                          : showPasswordConfirm
-                            ? "text"
-                            : "password"
-                      }
-                      autoComplete={
-                        isPassword ? "new-password" : "new-password"
-                      }
+                      type="email"
+                      inputMode="email"
+                      autoComplete="email"
                       aria-invalid={!!showFieldError}
                       aria-describedby={`${k}-error`}
                     />
-                    <button
-                      type="button"
-                      onClick={() => {
-                        if (isPassword) setShowPassword((s) => !s);
-                        else setShowPasswordConfirm((s) => !s);
+                  ) : k === "tenantSlug" ? (
+                    <input
+                      className={"mt-1 " + inputBase}
+                      value={form.tenantSlug}
+                      onChange={(e) => {
+                        setSlugDirty(true);
+                        set("tenantSlug", slugifyTyping(e.target.value)); // permite "-" no final enquanto digita
+                        setErr(null);
                       }}
-                      className="absolute right-2 top-1/2 -translate-y-1/2 grid h-9 w-9 place-items-center rounded-lg text-zinc-700 hover:bg-zinc-100"
-                      aria-label={
-                        (isPassword ? showPassword : showPasswordConfirm)
-                          ? "Ocultar senha"
-                          : "Mostrar senha"
-                      }
-                      title={
-                        (isPassword ? showPassword : showPasswordConfirm)
-                          ? "Ocultar"
-                          : "Mostrar"
-                      }
+                      onBlur={() => {
+                        setTouched((t) => ({ ...t, tenantSlug: true }));
+                        set("tenantSlug", slugifyFinal(form.tenantSlug)); // remove "-" no final quando sair do campo
+                      }}
+                      type="text"
+                      autoComplete="username"
+                      aria-invalid={!!showFieldError}
+                      aria-describedby={`tenantSlug-error`}
+                    />
+                  ) : (
+                    <input
+                      className={"mt-1 " + inputBase}
+                      value={form[k]}
+                      onChange={(e) => {
+                        set(k, e.target.value);
+                        setErr(null);
+                      }}
+                      onBlur={() => setTouched((t) => ({ ...t, [k]: true }))}
+                      type="text"
+                      aria-invalid={!!showFieldError}
+                      aria-describedby={`${k}-error`}
+                    />
+                  )}
+
+                  {k === "tenantSlug" && slugSuggestions.length >= 3 && (
+                    <div className="mt-2 flex flex-wrap gap-2">
+                      {slugSuggestions.map((sug) => (
+                        <button
+                          key={sug}
+                          type="button"
+                          className="rounded-full border px-3 py-1 text-xs text-zinc-700 hover:bg-zinc-50"
+                          onClick={() => {
+                            set("tenantSlug", sug);
+                            setSlugDirty(true); // escolheu manualmente
+                            setTouched((t) => ({ ...t, tenantSlug: true }));
+                          }}
+                          title="Usar sugestão"
+                        >
+                          {sug}
+                        </button>
+                      ))}
+                    </div>
+                  )}
+
+                  {showFieldError && (
+                    <div
+                      id={`${k}-error`}
+                      className="mt-1 text-xs text-red-600"
                     >
-                      {(isPassword ? showPassword : showPasswordConfirm) ? (
-                        <EyeOffIcon className="h-5 w-5" />
-                      ) : (
-                        <EyeIcon className="h-5 w-5" />
-                      )}
-                    </button>
-                  </div>
-                ) : k === "adminEmail" ? (
-                  <input
-                    className={"mt-1 " + inputBase}
-                    value={form[k]}
-                    onChange={(e) => {
-                      set(k, e.target.value);
-                      setErr(null);
-                    }}
-                    onBlur={() => setTouched((t) => ({ ...t, [k]: true }))}
-                    type="email"
-                    inputMode="email"
-                    autoComplete="email"
-                    aria-invalid={!!showFieldError}
-                    aria-describedby={`${k}-error`}
-                  />
-                ) : k === "tenantSlug" ? (
-                  <input
-                    className={"mt-1 " + inputBase}
-                    value={form.tenantSlug}
-                    onChange={(e) => {
-                      setSlugDirty(true);
-                      set("tenantSlug", slugifyTyping(e.target.value)); // permite "-" no final enquanto digita
-                      setErr(null);
-                    }}
-                    onBlur={() => {
-                      setTouched((t) => ({ ...t, tenantSlug: true }));
-                      set("tenantSlug", slugifyFinal(form.tenantSlug)); // remove "-" no final quando sair do campo
-                    }}
-                    type="text"
-                    autoComplete="username"
-                    aria-invalid={!!showFieldError}
-                    aria-describedby={`tenantSlug-error`}
-                  />
-                ) : (
-                  <input
-                    className={"mt-1 " + inputBase}
-                    value={form[k]}
-                    onChange={(e) => {
-                      set(k, e.target.value);
-                      setErr(null);
-                    }}
-                    onBlur={() => setTouched((t) => ({ ...t, [k]: true }))}
-                    type="text"
-                    aria-invalid={!!showFieldError}
-                    aria-describedby={`${k}-error`}
-                  />
-                )}
+                      {showFieldError}
+                    </div>
+                  )}
 
-                {k === "tenantSlug" && slugSuggestions.length >= 3 && (
-                  <div className="mt-2 flex flex-wrap gap-2">
-                    {slugSuggestions.map((sug) => (
-                      <button
-                        key={sug}
-                        type="button"
-                        className="rounded-full border px-3 py-1 text-xs text-zinc-700 hover:bg-zinc-50"
-                        onClick={() => {
-                          set("tenantSlug", sug);
-                          setSlugDirty(true); // escolheu manualmente
-                          setTouched((t) => ({ ...t, tenantSlug: true }));
-                        }}
-                        title="Usar sugestão"
-                      >
-                        {sug}
-                      </button>
-                    ))}
-                  </div>
-                )}
+                  {k === "tenantSlug" && !touched.tenantSlug && (
+                    <div className="mt-1 text-xs text-zinc-500">
+                      Dica: use letras minúsculas e hífen. Ex:{" "}
+                      <span className="font-mono">studio-bela</span>
+                    </div>
+                  )}
+                </div>
+              );
+            })}
 
-                {showFieldError && (
-                  <div id={`${k}-error`} className="mt-1 text-xs text-red-600">
-                    {showFieldError}
-                  </div>
-                )}
+            {err && <div className="text-sm text-red-600">{err}</div>}
 
-                {k === "tenantSlug" && !touched.tenantSlug && (
-                  <div className="mt-1 text-xs text-zinc-500">
-                    Dica: use letras minúsculas e hífen. Ex:{" "}
-                    <span className="font-mono">studio-bela</span>
-                  </div>
-                )}
-              </div>
-            );
-          })}
+            <button
+              disabled={!canSubmit}
+              className="w-full rounded-xl bg-zinc-900 text-white py-2 disabled:opacity-60"
+            >
+              {loading ? "Criando..." : "Criar"}
+            </button>
 
-          {err && <div className="text-sm text-red-600">{err}</div>}
-
-          <button
-            disabled={!canSubmit}
-            className="w-full rounded-xl bg-zinc-900 text-white py-2 disabled:opacity-60"
-          >
-            {loading ? "Criando..." : "Criar"}
-          </button>
-
-          <div className="text-sm text-zinc-600">
-            Já tem conta?{" "}
-            <Link className="underline" to="/admin/login">
-              Entrar
-            </Link>
-          </div>
-        </form>
+            <div className="text-sm text-zinc-600">
+              Já tem conta?{" "}
+              <Link className="underline" to="/admin/login">
+                Entrar
+              </Link>
+            </div>
+          </form>
+        </div>
       </div>
     </div>
   );
