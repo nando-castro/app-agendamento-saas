@@ -14,13 +14,14 @@ function formatMoney(cents: number) {
 type PixPayment = {
   paymentId: string;
   mpPaymentId?: string | null;
-  status: string; // pending | approved | rejected | cancelled ...
+  status: string;
   statusDetail?: string | null;
   expiresAt?: string | null;
-  qrCode?: string | null; // copia e cola
-  qrCodeBase64?: string | null; // imagem
+  qrCode?: string | null;
+  qrCodeBase64?: string | null;
   ticketUrl?: string | null;
 };
+
 type LinkScreenState = "OK" | "INVALID" | "INACTIVE";
 
 function pad2(n: number) {
@@ -32,6 +33,31 @@ function msToMMSS(ms: number) {
   const mm = Math.floor(total / 60);
   const ss = total % 60;
   return `${pad2(mm)}:${pad2(ss)}`;
+}
+
+function inputBase(hasError?: boolean) {
+  return [
+    "mt-1 w-full rounded-xl border px-3 py-2 outline-none",
+    "bg-background text-foreground",
+    "border-border focus:ring-2 focus:ring-ring/30 focus:border-ring/40",
+    hasError ? "border-destructive/60 ring-2 ring-destructive/20" : "",
+  ].join(" ");
+}
+
+function cardBase(className?: string) {
+  return [
+    "rounded-2xl border bg-card p-4 shadow-sm",
+    "border-border",
+    className ?? "",
+  ].join(" ");
+}
+
+function subtlePanel(className?: string) {
+  return [
+    "rounded-xl border bg-muted/30 p-3 text-sm",
+    "border-border",
+    className ?? "",
+  ].join(" ");
 }
 
 export default function PublicBookingPage() {
@@ -52,7 +78,6 @@ export default function PublicBookingPage() {
 
   const [created, setCreated] = useState<Booking | null>(null);
 
-  // PIX/payment
   const [pix, setPix] = useState<PixPayment | null>(null);
   const [pixErr, setPixErr] = useState<string | null>(null);
   const [pixLoading, setPixLoading] = useState(false);
@@ -60,7 +85,6 @@ export default function PublicBookingPage() {
   const [err, setErr] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
 
-  // countdown
   const [remainingMs, setRemainingMs] = useState<number | null>(null);
 
   const base = useMemo(() => `/public/links/${token}`, [token]);
@@ -71,6 +95,7 @@ export default function PublicBookingPage() {
 
   const [linkState, setLinkState] = useState<LinkScreenState>("OK");
   const [linkMsg, setLinkMsg] = useState<string>("");
+  const [availLoading, setAvailLoading] = useState(false);
 
   async function loadServices() {
     if (!token) return;
@@ -88,7 +113,6 @@ export default function PublicBookingPage() {
       const status = e?.response?.status as number | undefined;
       const msg = (e?.response?.data?.message as string | undefined) ?? "";
 
-      // Ajuste conforme seu backend:
       if (status === 404 || /token|inválid|inexistente/i.test(msg)) {
         setLinkState("INVALID");
         setLinkMsg(msg || "Esse link não existe ou expirou.");
@@ -124,12 +148,12 @@ export default function PublicBookingPage() {
           />
         </div>
 
-        <div className="mt-4 text-2xl sm:text-3xl font-semibold text-zinc-900">
+        <div className="mt-4 text-2xl sm:text-3xl font-semibold text-foreground">
           {props.title}
         </div>
 
         {props.message && (
-          <div className="mt-2 text-base sm:text-lg text-zinc-600 max-w-xl">
+          <div className="mt-2 text-base sm:text-lg text-muted-foreground max-w-xl">
             {props.message}
           </div>
         )}
@@ -148,7 +172,6 @@ export default function PublicBookingPage() {
 
     setErr(null);
 
-    // ✅ só reseta o fluxo quando trocou data/serviço (ou você quiser)
     if (resetFlow) {
       setCreated(null);
       setPix(null);
@@ -156,14 +179,13 @@ export default function PublicBookingPage() {
       setSelectedStartAt("");
     }
 
+    setAvailLoading(true);
     if (showLoader) show("Carregando horários...");
 
     try {
       const { data } = await publicApi.get<AvailabilityResponse>(
         `${base}/availability`,
-        {
-          params: { serviceId, date },
-        },
+        { params: { serviceId, date } },
       );
       setAvailability(data);
     } catch (e: any) {
@@ -172,10 +194,10 @@ export default function PublicBookingPage() {
       );
     } finally {
       if (showLoader) hide();
+      setAvailLoading(false);
     }
   }
 
-  // Sugestão: GET /public/links/:token/bookings/:bookingId
   async function loadBooking(bookingId: string) {
     const { data } = await publicApi.get<Booking>(
       `${base}/bookings/${bookingId}`,
@@ -187,7 +209,7 @@ export default function PublicBookingPage() {
     const payload = {
       bookingId,
       payerEmail: payerEmail || undefined,
-      intent: "SIGNAL", // ou "TOTAL"
+      intent: "SIGNAL",
     };
     const { data } = await publicApi.post<PixPayment>(`/payments/pix`, payload);
     return data;
@@ -195,7 +217,7 @@ export default function PublicBookingPage() {
 
   async function loadMpPaymentStatus(mpPaymentId: string) {
     const { data } = await publicApi.get<any>(`/payments/${mpPaymentId}`);
-    return data; // deve conter "status"
+    return data;
   }
 
   async function cancelBooking(bookingId: string) {
@@ -249,6 +271,7 @@ export default function PublicBookingPage() {
           await cancelBooking(bookingCreated.id);
         } catch {}
       }
+
       setErr(
         e?.response?.data?.message ??
           e?.message ??
@@ -289,19 +312,16 @@ export default function PublicBookingPage() {
     }
   }
 
-  // ✅ permanece na tela de pagamento enquanto existir um booking criado
   const inPaymentFlow = !!created;
   const approved =
     created?.status === "CONFIRMED" || pix?.status === "approved";
   const expired = created?.status === "EXPIRED";
   const awaitingPayment = inPaymentFlow && !approved && !expired;
 
-  // Polling: mantém a tela atualizada até aprovar (sem loading global)
   useEffect(() => {
     clearPollers();
     if (!created) return;
 
-    // countdown só faz sentido enquanto aguarda pagamento
     if (created.status === "PENDING_PAYMENT" && created.expiresAt) {
       const tick = () => {
         const end = new Date(created.expiresAt!).getTime();
@@ -314,7 +334,6 @@ export default function PublicBookingPage() {
       setRemainingMs(null);
     }
 
-    // se já confirmado/cancelado/expirado etc, não precisa polling
     if (created.status !== "PENDING_PAYMENT") return;
 
     pollRef.current = window.setInterval(async () => {
@@ -329,14 +348,10 @@ export default function PublicBookingPage() {
             setPix((p) => (p ? { ...p, status: mpStatus } : p));
           }
         }
-      } catch {
-        // silencioso
-      }
+      } catch {}
     }, 3000);
 
-    return () => {
-      clearPollers();
-    };
+    return () => clearPollers();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [created?.id, created?.status, created?.expiresAt, pix?.mpPaymentId]);
 
@@ -346,10 +361,10 @@ export default function PublicBookingPage() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [token]);
 
-  useEffect(() => {
-    void loadAvailability({ resetFlow: true, showLoader: true });
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [serviceId, date]);
+  // useEffect(() => {
+  //   void loadAvailability({ resetFlow: true, showLoader: true });
+  //   // eslint-disable-next-line react-hooks/exhaustive-deps
+  // }, [serviceId, date]);
 
   async function copyPixCode() {
     if (!pix?.qrCode) return;
@@ -366,12 +381,14 @@ export default function PublicBookingPage() {
   }
 
   return (
-    <div className="fixed inset-0 overflow-y-auto overscroll-y-contain bg-zinc-50 no-scrollbar [-webkit-overflow-scrolling:touch]">
+    <div className="fixed inset-0 overflow-y-auto overscroll-y-contain bg-background no-scrollbar [-webkit-overflow-scrolling:touch]">
       <div className="min-h-full p-4 sm:p-6 pb-24">
         <div className="max-w-3xl mx-auto space-y-6">
-          <header className="rounded-2xl bg-white shadow p-4">
-            <h1 className="text-xl font-semibold">Agendamento</h1>
-            <p className="text-sm text-zinc-600">
+          <header className={cardBase()}>
+            <h1 className="text-xl font-semibold text-foreground">
+              Agendamento
+            </h1>
+            <p className="text-sm text-muted-foreground">
               {inPaymentFlow
                 ? approved
                   ? "Pagamento confirmado."
@@ -381,6 +398,7 @@ export default function PublicBookingPage() {
                 : "Escolha serviço, data e horário."}
             </p>
           </header>
+
           {!loading && linkState === "INVALID" && (
             <FullScreenState
               title="Link inválido"
@@ -403,22 +421,23 @@ export default function PublicBookingPage() {
           )}
 
           {err && (
-            <div className="rounded-xl bg-red-50 border border-red-200 p-3 text-sm text-red-700">
+            <div className="rounded-xl border border-destructive/30 bg-destructive/10 p-3 text-sm text-destructive">
               {err}
             </div>
           )}
 
           {!loading && linkState !== "OK" ? null : (
             <>
-              {/* FORMULARIO (some quando entrou no fluxo de pagamento) */}
               {!inPaymentFlow && (
                 <>
-                  <section className="rounded-2xl bg-white shadow p-4 space-y-4">
+                  <section className={cardBase("space-y-4")}>
                     <div className="grid gap-3 sm:grid-cols-2">
                       <div>
-                        <label className="text-sm">Serviço</label>
+                        <label className="text-sm text-muted-foreground">
+                          Serviço
+                        </label>
                         <select
-                          className="mt-1 w-full rounded-xl border px-3 py-2"
+                          className={inputBase(false)}
                           value={serviceId}
                           onChange={(e) => setServiceId(e.target.value)}
                         >
@@ -435,40 +454,79 @@ export default function PublicBookingPage() {
                       </div>
 
                       <div>
-                        <label className="text-sm">Data</label>
+                        <label className="text-sm text-muted-foreground">
+                          Data
+                        </label>
                         <input
                           type="date"
-                          className="mt-1 w-full rounded-xl border px-3 py-2"
+                          className={inputBase(false)}
                           value={date}
                           onChange={(e) => setDate(e.target.value)}
                         />
                       </div>
                     </div>
 
+                    <div className="flex justify-end flex-col sm:flex-row gap-2">
+                      <button
+                        type="button"
+                        className="w-full sm:w-auto rounded-xl bg-primary text-primary-foreground px-4 py-2 text-sm font-medium disabled:opacity-60"
+                        disabled={!serviceId || !date || availLoading}
+                        onClick={() =>
+                          void loadAvailability({
+                            resetFlow: true,
+                            showLoader: true,
+                          })
+                        }
+                      >
+                        {availLoading ? "Buscando..." : "Buscar horários"}
+                      </button>
+
+                      {/* {availability && (
+                        <button
+                          type="button"
+                          className="w-full sm:w-auto rounded-xl border border-border bg-card px-4 py-2 text-sm hover:bg-muted/40 disabled:opacity-60"
+                          disabled={availLoading}
+                          onClick={() => {
+                            setAvailability(null);
+                            setSelectedStartAt("");
+                          }}
+                        >
+                          Limpar
+                        </button>
+                      )} */}
+                    </div>
+
                     <div>
-                      <div className="text-sm font-medium">
-                        Horários disponíveis
+                      <div className="text-sm font-medium text-foreground">
+                        Horários disponíveis:
                       </div>
+
                       <div className="mt-2 grid grid-cols-2 sm:grid-cols-4 gap-2">
-                        {availability?.slots?.map((s) => (
-                          <button
-                            key={s.startAt}
-                            className={[
-                              "rounded-xl border px-3 py-2 text-sm",
-                              selectedStartAt === s.startAt
-                                ? "bg-zinc-900 text-white"
-                                : "bg-white",
-                            ].join(" ")}
-                            onClick={() => setSelectedStartAt(s.startAt)}
-                          >
-                            {new Date(s.startAt).toLocaleTimeString([], {
-                              hour: "2-digit",
-                              minute: "2-digit",
-                            })}
-                          </button>
-                        ))}
+                        {availability?.slots?.map((s) => {
+                          const selected = selectedStartAt === s.startAt;
+                          return (
+                            <button
+                              key={s.startAt}
+                              type="button"
+                              className={[
+                                "rounded-xl border px-3 py-2 text-sm transition-colors",
+                                "border-border",
+                                selected
+                                  ? "bg-primary text-primary-foreground"
+                                  : "bg-card hover:bg-muted/40",
+                              ].join(" ")}
+                              onClick={() => setSelectedStartAt(s.startAt)}
+                            >
+                              {new Date(s.startAt).toLocaleTimeString([], {
+                                hour: "2-digit",
+                                minute: "2-digit",
+                              })}
+                            </button>
+                          );
+                        })}
+
                         {availability && availability.slots.length === 0 && (
-                          <div className="text-sm text-zinc-600 col-span-full">
+                          <div className="text-sm text-muted-foreground col-span-full">
                             Sem horários para este dia.
                           </div>
                         )}
@@ -476,24 +534,31 @@ export default function PublicBookingPage() {
                     </div>
                   </section>
 
-                  <section className="rounded-2xl bg-white shadow p-4 space-y-3">
-                    <h2 className="font-semibold">Seus dados</h2>
+                  <section className={cardBase("space-y-3")}>
+                    <h2 className="font-semibold text-foreground">
+                      Seus dados
+                    </h2>
 
                     <div className="grid gap-3 sm:grid-cols-2">
                       <div>
-                        <label className="text-sm">Nome</label>
+                        <label className="text-sm text-muted-foreground">
+                          Nome
+                        </label>
                         <input
-                          className="mt-1 w-full rounded-xl border px-3 py-2"
+                          className={inputBase(false)}
                           value={customer.name}
                           onChange={(e) =>
                             setCustomer((p) => ({ ...p, name: e.target.value }))
                           }
                         />
                       </div>
+
                       <div>
-                        <label className="text-sm">Telefone</label>
+                        <label className="text-sm text-muted-foreground">
+                          Telefone
+                        </label>
                         <input
-                          className="mt-1 w-full rounded-xl border px-3 py-2"
+                          className={inputBase(false)}
                           value={customer.phone}
                           onChange={(e) =>
                             setCustomer((p) => ({
@@ -506,23 +571,26 @@ export default function PublicBookingPage() {
                     </div>
 
                     <div>
-                      <label className="text-sm">Email</label>
+                      <label className="text-sm text-muted-foreground">
+                        Email
+                      </label>
                       <input
-                        className="mt-1 w-full rounded-xl border px-3 py-2"
+                        className={inputBase(false)}
                         value={customer.email}
                         onChange={(e) =>
                           setCustomer((p) => ({ ...p, email: e.target.value }))
                         }
                       />
 
-                      <div className="text-xs text-zinc-500 mt-1">
+                      <div className="text-xs text-muted-foreground mt-1">
                         Obs.: Para gerar PIX, o Mercado Pago normalmente exige
                         email do pagador.
                       </div>
                     </div>
 
                     <button
-                      className="w-full rounded-xl bg-zinc-900 text-white py-2 disabled:opacity-60"
+                      type="button"
+                      className="w-full rounded-xl bg-primary text-primary-foreground py-2 font-medium disabled:opacity-60"
                       disabled={
                         !selectedStartAt ||
                         !customer.name ||
@@ -536,9 +604,9 @@ export default function PublicBookingPage() {
                     </button>
 
                     {selectedService && (
-                      <div className="text-sm text-zinc-600">
+                      <div className="text-sm text-muted-foreground">
                         Serviço:{" "}
-                        <span className="font-medium">
+                        <span className="font-medium text-foreground">
                           {selectedService.name}
                         </span>{" "}
                         • {formatMoney(selectedService.priceCents)}
@@ -548,15 +616,14 @@ export default function PublicBookingPage() {
                 </>
               )}
 
-              {/* TELA DE PAGAMENTO PIX */}
               {inPaymentFlow && created && (
-                <section className="rounded-2xl bg-white shadow p-4 space-y-4">
+                <section className={cardBase("space-y-4")}>
                   <div className="flex items-start justify-between gap-4">
                     <div>
-                      <h2 className="text-lg font-semibold">
+                      <h2 className="text-lg font-semibold text-foreground">
                         Pagamento via PIX
                       </h2>
-                      <p className="text-sm text-zinc-600">
+                      <p className="text-sm text-muted-foreground">
                         {approved
                           ? "Pagamento aprovado. Seu agendamento está confirmado."
                           : expired
@@ -568,12 +635,12 @@ export default function PublicBookingPage() {
                     <div className="text-right">
                       <div
                         className={[
-                          "inline-flex items-center rounded-full px-3 py-1 text-xs font-medium",
+                          "inline-flex items-center rounded-full px-3 py-1 text-xs font-medium border",
                           approved
-                            ? "bg-green-100 text-green-800"
+                            ? "bg-emerald-500/10 text-emerald-300 border-emerald-500/20"
                             : expired
-                              ? "bg-red-100 text-red-800"
-                              : "bg-amber-100 text-amber-800",
+                              ? "bg-destructive/10 text-destructive border-destructive/20"
+                              : "bg-amber-500/10 text-amber-300 border-amber-500/20",
                         ].join(" ")}
                       >
                         {approved
@@ -584,9 +651,9 @@ export default function PublicBookingPage() {
                       </div>
 
                       {created.expiresAt && awaitingPayment && (
-                        <div className="mt-1 text-xs text-zinc-600">
+                        <div className="mt-1 text-xs text-muted-foreground">
                           Expira em:{" "}
-                          <span className="font-mono">
+                          <span className="font-mono text-foreground">
                             {remainingMs == null
                               ? "--:--"
                               : msToMMSS(remainingMs)}
@@ -596,32 +663,35 @@ export default function PublicBookingPage() {
                     </div>
                   </div>
 
-                  <div className="rounded-xl bg-zinc-50 border p-3 text-sm">
+                  <div className={subtlePanel()}>
                     <div>
                       Código:{" "}
-                      <span className="font-mono font-semibold">
+                      <span className="font-mono font-semibold text-foreground">
                         {created.code}
                       </span>
                     </div>
-                    <div>
-                      Horário: {new Date(created.startAt).toLocaleString()}
+                    <div className="text-muted-foreground">
+                      Horário:{" "}
+                      <span className="text-foreground">
+                        {new Date(created.startAt).toLocaleString()}
+                      </span>
                     </div>
-                    <div className="mt-2 text-zinc-700">
+
+                    <div className="mt-2 text-muted-foreground">
                       {created.signalAmountCents > 0 ? (
                         <>
                           Valor do sinal:{" "}
-                          <span className="font-semibold">
+                          <span className="font-semibold text-foreground">
                             {formatMoney(created.signalAmountCents)}
-                          </span>
-                          <span className="text-xs text-zinc-500">
-                            {" "}
+                          </span>{" "}
+                          <span className="text-xs text-muted-foreground">
                             (para confirmar)
                           </span>
                         </>
                       ) : (
                         <>
                           Valor:{" "}
-                          <span className="font-semibold">
+                          <span className="font-semibold text-foreground">
                             {formatMoney(created.totalPriceCents)}
                           </span>
                         </>
@@ -630,20 +700,20 @@ export default function PublicBookingPage() {
                   </div>
 
                   {pixErr && (
-                    <div className="rounded-xl bg-red-50 border border-red-200 p-3 text-sm text-red-700">
+                    <div className="rounded-xl border border-destructive/30 bg-destructive/10 p-3 text-sm text-destructive">
                       {pixErr}
                     </div>
                   )}
 
                   {!pix && !pixLoading && awaitingPayment && (
                     <div className="space-y-2">
-                      <div className="text-sm text-zinc-700">
+                      <div className="text-sm text-muted-foreground">
                         Precisamos gerar o PIX para você. Se o email estiver
                         vazio, informe abaixo:
                       </div>
 
                       <input
-                        className="w-full rounded-xl border px-3 py-2"
+                        className={inputBase(false).replace("mt-1 ", "")}
                         placeholder="Email do pagador"
                         value={customer.email}
                         onChange={(e) =>
@@ -652,7 +722,8 @@ export default function PublicBookingPage() {
                       />
 
                       <button
-                        className="w-full rounded-xl bg-zinc-900 text-white py-2 disabled:opacity-60"
+                        type="button"
+                        className="w-full rounded-xl bg-primary text-primary-foreground py-2 font-medium disabled:opacity-60"
                         disabled={!customer.email}
                         onClick={() =>
                           void startPixFlow(created, customer.email)
@@ -664,14 +735,16 @@ export default function PublicBookingPage() {
                   )}
 
                   {pixLoading && (
-                    <div className="text-sm text-zinc-600">Gerando PIX...</div>
+                    <div className="text-sm text-muted-foreground">
+                      Gerando PIX...
+                    </div>
                   )}
 
                   {approved && (
                     <div className="grid gap-4 sm:grid-cols-2">
-                      <div className="rounded-2xl border p-4 bg-white">
+                      <div className={cardBase()}>
                         <div className="flex flex-col items-center justify-center py-10">
-                          <div className="h-20 w-20 rounded-full bg-lime-500 flex items-center justify-center">
+                          <div className="h-20 w-20 rounded-full bg-emerald-500 flex items-center justify-center">
                             <svg
                               viewBox="0 0 24 24"
                               fill="none"
@@ -686,39 +759,45 @@ export default function PublicBookingPage() {
                               />
                             </svg>
                           </div>
-                          <div className="mt-4 text-sm font-semibold text-zinc-900">
+                          <div className="mt-4 text-sm font-semibold text-foreground">
                             Confirmado
                           </div>
-                          <div className="text-xs text-zinc-500 mt-1 text-center">
+                          <div className="text-xs text-muted-foreground mt-1 text-center">
                             Pagamento identificado.
                           </div>
                         </div>
                       </div>
 
-                      <div className="rounded-2xl border p-4 bg-white">
-                        <div className="text-sm font-medium">
+                      <div className={cardBase()}>
+                        <div className="text-sm font-medium text-foreground">
                           Detalhes do agendamento
                         </div>
 
                         <div className="mt-3 space-y-2 text-sm">
                           <div className="flex justify-between gap-4">
-                            <span className="text-zinc-500">Código</span>
-                            <span className="font-mono font-semibold">
+                            <span className="text-muted-foreground">
+                              Código
+                            </span>
+                            <span className="font-mono font-semibold text-foreground">
                               {created.code}
                             </span>
                           </div>
 
                           <div className="flex justify-between gap-4">
-                            <span className="text-zinc-500">Horário</span>
-                            <span className="font-medium">
+                            <span className="text-muted-foreground">
+                              Horário
+                            </span>
+                            <span className="font-medium text-foreground">
                               {new Date(created.startAt).toLocaleString()}
                             </span>
                           </div>
 
                           {selectedService && (
                             <div className="flex justify-between gap-4">
-                              <span className="text-zinc-500">Serviço</span>
-                              <span className="font-medium">
+                              <span className="text-muted-foreground">
+                                Serviço
+                              </span>
+                              <span className="font-medium text-foreground">
                                 {selectedService.name} •{" "}
                                 {selectedService.durationMinutes}min
                               </span>
@@ -726,12 +805,12 @@ export default function PublicBookingPage() {
                           )}
 
                           <div className="flex justify-between gap-4">
-                            <span className="text-zinc-500">
+                            <span className="text-muted-foreground">
                               {created.signalAmountCents > 0
                                 ? "Sinal"
                                 : "Total"}
                             </span>
-                            <span className="font-semibold">
+                            <span className="font-semibold text-foreground">
                               {formatMoney(
                                 created.signalAmountCents > 0
                                   ? created.signalAmountCents
@@ -740,15 +819,17 @@ export default function PublicBookingPage() {
                             </span>
                           </div>
 
-                          <div className="pt-3 mt-3 border-t">
-                            <div className="text-xs text-zinc-500 mb-2">
+                          <div className="pt-3 mt-3 border-t border-border">
+                            <div className="text-xs text-muted-foreground mb-2">
                               Cliente
                             </div>
-                            <div className="text-sm">{customer.name}</div>
-                            <div className="text-sm text-zinc-600">
+                            <div className="text-sm text-foreground">
+                              {customer.name}
+                            </div>
+                            <div className="text-sm text-muted-foreground">
                               {customer.phone}
                             </div>
-                            <div className="text-sm text-zinc-600">
+                            <div className="text-sm text-muted-foreground">
                               {customer.email}
                             </div>
                           </div>
@@ -759,17 +840,19 @@ export default function PublicBookingPage() {
 
                   {awaitingPayment && pix && (
                     <div className="grid gap-4 sm:grid-cols-2">
-                      <div className="rounded-2xl border p-4 bg-white">
-                        <div className="text-sm font-medium">QR Code</div>
+                      <div className={cardBase()}>
+                        <div className="text-sm font-medium text-foreground">
+                          QR Code
+                        </div>
                         <div className="mt-3 flex justify-center">
                           {pix.qrCodeBase64 ? (
                             <img
                               alt="QR Code PIX"
-                              className="w-56 h-56"
+                              className="w-56 h-56 rounded-xl bg-white p-2"
                               src={`data:image/png;base64,${pix.qrCodeBase64}`}
                             />
                           ) : (
-                            <div className="text-sm text-zinc-600">
+                            <div className="text-sm text-muted-foreground">
                               QR Code indisponível.
                             </div>
                           )}
@@ -777,7 +860,7 @@ export default function PublicBookingPage() {
 
                         {pix.ticketUrl && (
                           <a
-                            className="mt-3 block text-sm text-blue-600 hover:underline"
+                            className="mt-3 block text-sm text-primary hover:underline"
                             href={pix.ticketUrl}
                             target="_blank"
                             rel="noreferrer"
@@ -787,19 +870,24 @@ export default function PublicBookingPage() {
                         )}
                       </div>
 
-                      <div className="rounded-2xl border p-4 bg-white space-y-3">
+                      <div className={cardBase("space-y-3")}>
                         <div>
-                          <div className="text-sm font-medium">
+                          <div className="text-sm font-medium text-foreground">
                             Pix “copia e cola”
                           </div>
                           <textarea
                             readOnly
-                            className="mt-2 w-full h-36 rounded-xl border p-2 text-xs font-mono"
+                            className={[
+                              "mt-2 w-full h-36 rounded-xl border p-2 text-xs font-mono outline-none",
+                              "bg-background text-foreground border-border",
+                              "focus:ring-2 focus:ring-ring/30 focus:border-ring/40",
+                            ].join(" ")}
                             value={pix.qrCode ?? ""}
                           />
                           <div className="flex gap-2 mt-2">
                             <button
-                              className="flex-1 rounded-xl bg-zinc-900 text-white py-2 text-sm disabled:opacity-60"
+                              type="button"
+                              className="flex-1 rounded-xl bg-primary text-primary-foreground py-2 text-sm font-medium disabled:opacity-60"
                               disabled={!pix.qrCode}
                               onClick={() => void copyPixCode()}
                             >
@@ -807,7 +895,8 @@ export default function PublicBookingPage() {
                             </button>
 
                             <button
-                              className="flex-1 rounded-xl border py-2 text-sm"
+                              type="button"
+                              className="flex-1 rounded-xl border border-border bg-card py-2 text-sm hover:bg-muted/40"
                               onClick={async () => {
                                 try {
                                   const b = await loadBooking(created.id);
@@ -833,14 +922,15 @@ export default function PublicBookingPage() {
                           </div>
                         </div>
 
-                        <div className="text-xs text-zinc-500">
+                        <div className="text-xs text-muted-foreground">
                           A tela atualiza automaticamente. Assim que o pagamento
                           for aprovado, seu agendamento será confirmado.
                         </div>
 
                         {import.meta.env.DEV && pix.paymentId && (
                           <button
-                            className="w-full rounded-xl border py-2 text-sm"
+                            type="button"
+                            className="w-full rounded-xl border border-border bg-card py-2 text-sm hover:bg-muted/40"
                             onClick={async () => {
                               try {
                                 await publicApi.post(
@@ -859,11 +949,11 @@ export default function PublicBookingPage() {
                   )}
 
                   {expired && (
-                    <div className="rounded-2xl bg-red-50 border border-red-200 p-4">
-                      <h3 className="font-semibold text-red-800">
+                    <div className="rounded-2xl border border-destructive/30 bg-destructive/10 p-4">
+                      <h3 className="font-semibold text-destructive">
                         Reserva expirada
                       </h3>
-                      <div className="text-sm text-red-800 mt-1">
+                      <div className="text-sm text-muted-foreground mt-1">
                         O prazo para pagamento terminou. Volte e faça um novo
                         agendamento.
                       </div>

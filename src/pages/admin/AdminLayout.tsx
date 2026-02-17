@@ -1,3 +1,5 @@
+import AdminSettingsMenu from "@/components/AdminSettingsMenu";
+import ThemeToggle from "@/components/ThemeToggle";
 import { Button } from "@/components/ui/button";
 import { Separator } from "@/components/ui/separator";
 import { useLoading } from "@/lib/loading";
@@ -116,15 +118,18 @@ export default function AdminLayout() {
             <div className="text-xs text-muted-foreground">{sectionLabel}</div>
           </div>
 
-          <Button
-            variant="outline"
-            size="sm"
-            onClick={logout}
-            className="gap-2"
-          >
-            <LogOut className="h-4 w-4" />
-            Sair
-          </Button>
+          <div className="flex items-center gap-2">
+            <ThemeToggle />
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={logout}
+              className="gap-2"
+            >
+              <LogOut className="h-4 w-4" />
+              Sair
+            </Button>
+          </div>
         </div>
       </header>
 
@@ -164,6 +169,11 @@ export default function AdminLayout() {
                 </nav>
 
                 <Separator className="my-3" />
+
+                <div className="space-y-2 px-2 pb-2">
+                  <AdminSettingsMenu />
+                </div>
+
                 <Button variant="outline" className="w-full" onClick={logout}>
                   Sair
                 </Button>

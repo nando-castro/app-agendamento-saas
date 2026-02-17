@@ -7,6 +7,14 @@ import App from "./App";
 import ErrorFallback from "./components/ui/ErrorFallback";
 import "./index.css";
 
+import { applyThemeMode, getThemeMode } from "@/components/ThemeToggle";
+import { applyUserTheme, loadUserTheme } from "@/lib/userTheme";
+import { getMode, setMode } from "./lib/theme";
+applyThemeMode(getThemeMode());
+applyUserTheme(loadUserTheme());
+
+setMode(getMode());
+
 ReactDOM.createRoot(document.getElementById("root")!).render(
   <StrictMode>
     <LoadingProvider>

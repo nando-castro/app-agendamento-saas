@@ -17,6 +17,7 @@ import PublicBookingPage from "@/pages/public/PublicBookingPage";
 import FullscreenLoader from "@/components/ui/FullscreenLoader";
 import { isJwtExpired } from "@/lib/jwt";
 import NotFoundPage from "@/pages/NotFoundPage";
+import AppearancePage from "./pages/admin/settings/AppearancePage";
 
 function AdminGuard({ children }: { children: React.ReactNode }) {
   const location = useLocation();
@@ -92,6 +93,8 @@ export default function App() {
         <Route path="services" element={<AdminServicesPage />} />
         <Route path="schedule" element={<AdminSchedulePage />} />
         <Route path="bookings" element={<AdminBookingsPage />} />
+
+        <Route path="settings/appearance" element={<AppearancePage />} />
       </Route>
 
       {/* Fallback global: escolha UMA opção */}
