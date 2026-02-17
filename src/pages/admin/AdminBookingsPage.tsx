@@ -134,14 +134,18 @@ export default function AdminBookingsPage() {
                 <Input
                   type="date"
                   value={range.from}
-                  onChange={(e) =>
-                    setRange((p) => ({ ...p, from: e.target.value }))
-                  }
+                  max={range.to}
+                  onChange={(e) => {
+                    const newFrom = e.target.value;
+                    setRange((p) => {
+                      const newTo = p.to && p.to < newFrom ? newFrom : p.to; // YYYY-MM-DD compara OK
+                      return { ...p, from: newFrom, to: newTo };
+                    });
+                  }}
                   className="pl-10 rounded-2xl"
                 />
               </div>
             </div>
-
             <div className="space-y-1">
               <div className="text-[11px] uppercase tracking-widest text-muted-foreground">
                 Até
@@ -151,6 +155,7 @@ export default function AdminBookingsPage() {
                 <Input
                   type="date"
                   value={range.to}
+                  min={range.from}
                   onChange={(e) =>
                     setRange((p) => ({ ...p, to: e.target.value }))
                   }
