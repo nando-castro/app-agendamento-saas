@@ -158,6 +158,42 @@ export default function AdminSchedulePage() {
     [],
   );
 
+  const timeRefs = useRef<Record<string, HTMLInputElement | null>>({});
+
+  function setTimeRef(key: string) {
+    return (el: HTMLInputElement | null) => {
+      timeRefs.current[key] = el;
+    };
+  }
+
+  function validateHoursDraftUI(): boolean {
+    for (const h of hoursDraft) {
+      if (!h.active) continue;
+
+      const startEl = timeRefs.current[`s-${h.weekday}`];
+      const endEl = timeRefs.current[`e-${h.weekday}`];
+
+      // limpa mensagens antigas
+      startEl?.setCustomValidity("");
+      endEl?.setCustomValidity("");
+
+      const startOk = !!normalizeTime(h.startTime);
+      const endOk = !!normalizeTime(h.endTime);
+
+      if (!startOk) {
+        startEl?.setCustomValidity("Informe um horário válido (HH:mm).");
+        startEl?.reportValidity();
+        return false;
+      }
+      if (!endOk) {
+        endEl?.setCustomValidity("Informe um horário válido (HH:mm).");
+        endEl?.reportValidity();
+        return false;
+      }
+    }
+    return true;
+  }
+
   const startAtRef = useRef<HTMLInputElement | null>(null);
   const endAtRef = useRef<HTMLInputElement | null>(null);
 
@@ -638,14 +674,19 @@ export default function AdminSchedulePage() {
                     <div className="grid gap-1.5">
                       <Label>Início</Label>
                       <Input
-                        type="datetime-local"
-                        value={blockForm.startAt}
-                        max={maxDate} // ✅ limite
+                        ref={setTimeRef(`s-${h.weekday}`)}
+                        type="time"
+                        required={h.active}
+                        value={h.startTime}
+                        disabled={!h.active}
                         onChange={(e) =>
-                          setBlockForm((p) => ({
-                            ...p,
-                            startAt: e.target.value,
-                          }))
+                          setHoursDraft((p) =>
+                            p.map((x, i) =>
+                              i === idx
+                                ? { ...x, startTime: e.target.value }
+                                : x,
+                            ),
+                          )
                         }
                       />
                     </div>
@@ -653,12 +694,17 @@ export default function AdminSchedulePage() {
                     <div className="grid gap-1.5">
                       <Label>Fim</Label>
                       <Input
-                        type="datetime-local"
-                        value={blockForm.endAt}
-                        min={blockForm.startAt} // ✅ não antes do início
-                        max={maxDate}
+                        ref={setTimeRef(`e-${h.weekday}`)}
+                        type="time"
+                        required={h.active}
+                        value={h.endTime}
+                        disabled={!h.active}
                         onChange={(e) =>
-                          setBlockForm((p) => ({ ...p, endAt: e.target.value }))
+                          setHoursDraft((p) =>
+                            p.map((x, i) =>
+                              i === idx ? { ...x, endTime: e.target.value } : x,
+                            ),
+                          )
                         }
                       />
                     </div>
@@ -673,7 +719,10 @@ export default function AdminSchedulePage() {
               Cancelar
             </Button>
             <Button
-              onClick={() => void saveHoursFromModal()}
+              onClick={() => {
+                if (!validateHoursDraftUI()) return;
+                void saveHoursFromModal();
+              }}
               disabled={savingHours}
             >
               {savingHours ? "Salvando..." : "Salvar"}
