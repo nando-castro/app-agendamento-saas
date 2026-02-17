@@ -409,13 +409,14 @@ export default function AdminSchedulePage() {
 
             {/* DIREITA */}
             <div className="flex justify-end">
-              <Button
+              {/* <Button
+                variant="add"
                 size="sm"
                 className="rounded-full hidden md:inline-flex"
                 onClick={openHoursEditor}
               >
                 {hoursConfigured ? "Editar" : "Configurar"}
-              </Button>
+              </Button> */}
             </div>
           </div>
         </div>
@@ -444,7 +445,7 @@ export default function AdminSchedulePage() {
           {/* ✅ somente “editar” quando já existir horários */}
           {hoursConfigured ? (
             <Button
-              variant="outline"
+              variant="edit"
               className="rounded-xl gap-2"
               onClick={openHoursEditor}
             >
@@ -543,7 +544,13 @@ export default function AdminSchedulePage() {
           </Button>
 
           {/* Desktop/Tablet */}
-          <Button className="hidden sm:inline-flex rounded-xl gap-2">
+          <Button
+            variant="add"
+            className="hidden sm:inline-flex rounded-xl gap-2"
+            onClick={() => setOpenBlock(true)}
+            aria-label="Novo bloqueio"
+            title="Novo bloqueio"
+          >
             <Plus className="h-4 w-4" />
             Novo bloqueio
           </Button>

@@ -10,7 +10,7 @@ import { Separator } from "@/components/ui/separator";
 
 import bookingService from "@/gateway/services/bookingsService";
 import { useLoading } from "@/lib/loading";
-import { Bell, CalendarDays, Filter, Phone, Search, User } from "lucide-react";
+import { CalendarDays, Filter, Phone, Search, User } from "lucide-react";
 
 import {
   DropdownMenu,
@@ -139,7 +139,7 @@ export default function AdminBookingsPage() {
           </p>
         </div>
 
-        <Button
+        {/* <Button
           size="icon"
           variant="outline"
           className="rounded-full shrink-0"
@@ -147,7 +147,7 @@ export default function AdminBookingsPage() {
           title="Notificações"
         >
           <Bell className="h-4 w-4" />
-        </Button>
+        </Button> */}
       </div>
 
       {err && (
@@ -205,7 +205,7 @@ export default function AdminBookingsPage() {
           <Button
             onClick={() => void load("Buscando agendamentos...")}
             className="w-full rounded-2xl gap-2"
-            variant="outline"
+            variant="search"
             disabled={loading} // opcional
           >
             <Search className="h-4 w-4" />

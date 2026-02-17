@@ -35,7 +35,7 @@ export default function AdminSettingsMenu({ compact }: Props) {
             <Settings className="h-4 w-4" />
           </Button>
         ) : (
-          <Button variant="outline" className="w-full justify-start gap-2">
+          <Button variant="add" className="w-full justify-start gap-2">
             <Settings className="h-4 w-4" />
             Configurações
           </Button>

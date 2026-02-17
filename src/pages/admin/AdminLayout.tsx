@@ -56,7 +56,7 @@ function BottomItem({
         [
           "flex flex-1 flex-col items-center justify-center gap-1 py-2 text-xs transition-colors",
           isActive
-            ? "text-primary"
+            ? "text-foreground font-medium"
             : "text-muted-foreground hover:text-foreground",
         ].join(" ")
       }
@@ -121,7 +121,7 @@ export default function AdminLayout() {
           <div className="flex items-center gap-2">
             <ThemeToggle />
             <Button
-              variant="outline"
+              variant="exit"
               size="sm"
               onClick={logout}
               className="gap-2"
@@ -174,7 +174,7 @@ export default function AdminLayout() {
                   <AdminSettingsMenu />
                 </div>
 
-                <Button variant="outline" className="w-full" onClick={logout}>
+                <Button variant="exit" className="w-full" onClick={logout}>
                   Sair
                 </Button>
               </div>

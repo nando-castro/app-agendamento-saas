@@ -318,7 +318,7 @@ export default function AdminDashboardPage() {
                 </div>
 
                 <Button
-                  variant="outline"
+                  variant="add"
                   className="rounded-xl"
                   onClick={() => nav(SCHEDULE_ROUTE)}
                 >
@@ -375,7 +375,7 @@ export default function AdminDashboardPage() {
                 }
                 className="rounded-full gap-2 w-full sm:w-auto"
                 variant={
-                  generalLink && !generalLink.active ? "default" : "secondary"
+                  generalLink && !generalLink.active ? "add" : "secondary"
                 }
               >
                 <Plus className="h-4 w-4" />
@@ -669,8 +669,8 @@ export default function AdminDashboardPage() {
                         }
                         variant={
                           existingLink && !existingLink.active
-                            ? "default"
-                            : "secondary"
+                            ? "secondary"
+                            : "add"
                         }
                       >
                         {btnLabel}

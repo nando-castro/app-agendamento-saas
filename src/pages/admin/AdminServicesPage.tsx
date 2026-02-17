@@ -328,6 +328,7 @@ export default function AdminServicesPage() {
 
         {/* Mobile */}
         <Button
+          variant="default"
           onClick={openCreate}
           size="icon"
           className="rounded-full shrink-0 sm:hidden"
@@ -339,6 +340,7 @@ export default function AdminServicesPage() {
 
         {/* Desktop/Tablet */}
         <Button
+          variant="add"
           onClick={openCreate}
           className="hidden sm:inline-flex rounded-xl gap-2"
         >
@@ -486,7 +488,7 @@ export default function AdminServicesPage() {
 
                 <div className="grid grid-cols-2 gap-2">
                   <Button
-                    variant="outline"
+                    variant="edit"
                     className="rounded-xl gap-2"
                     onClick={() => openEdit(s)}
                   >
@@ -495,7 +497,7 @@ export default function AdminServicesPage() {
                   </Button>
 
                   <Button
-                    variant={s.active ? "secondary" : "default"}
+                    variant={s.active ? "secondary" : "success"}
                     className={[
                       "rounded-xl gap-2",
                       s.active ? "text-rose-700" : "",
@@ -767,7 +769,7 @@ export default function AdminServicesPage() {
             <Button variant="outline" onClick={() => setOpen(false)}>
               Cancelar
             </Button>
-            <Button onClick={() => void save()}>
+            <Button onClick={() => void save()} variant="add">
               {editing ? "Salvar" : "Criar"}
             </Button>
           </DialogFooter>
