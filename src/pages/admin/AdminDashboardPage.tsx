@@ -283,6 +283,21 @@ export default function AdminDashboardPage() {
     return generalLink.active ? "Link geral já criado" : "Reativar link geral";
   }, [generalLink]);
 
+  const orderedLinks = useMemo(() => {
+    const arr = links ?? [];
+
+    const isGeneral = (l: BookingLink) => {
+      const anyL = l as any;
+      const sid = anyL.serviceId ?? anyL.service_id ?? anyL.service?.id ?? null;
+      return !anyL.service && !sid;
+    };
+
+    const general = arr.find(isGeneral);
+    const rest = arr.filter((l) => !isGeneral(l));
+
+    return general ? [general, ...rest] : rest;
+  }, [links]);
+
   return (
     <div className="w-full max-w-none space-y-6 overflow-x-hidden px-4 md:px-0">
       {err && <div className="text-sm text-rose-600">{err}</div>}
@@ -369,30 +384,36 @@ export default function AdminDashboardPage() {
             </div>
 
             <div className="grid w-full gap-3">
-              {links.map((l) => {
+              {orderedLinks.map((l) => {
                 const url = `${origin}/public/${l.token}`;
                 const isActive = !!l.active;
                 const isBusy = togglingId === l.id;
 
-                const scopeLabel = l.service
-                  ? `Restrito: ${l.service.name}`
-                  : "Geral";
+                // const scopeLabel = l.service
+                //   ? `Restrito: ${l.service.name}`
+                //   : "Geral";
 
                 const disableActivate = !hoursReady && !isActive;
 
+                const anyL = l as any;
+                const isGeneral =
+                  !anyL.service &&
+                  !(anyL.serviceId ?? anyL.service_id ?? anyL.service?.id);
+
                 return (
-                  <Card key={l.id} className="w-full rounded-2xl">
+                  <Card
+                    key={l.id}
+                    className={[
+                      "w-full rounded-2xl",
+                      isGeneral
+                        ? "ring-2 ring-amber-500/40 bg-amber-500/5"
+                        : "",
+                    ].join(" ")}
+                  >
                     <CardContent className="p-4 space-y-3">
                       <div className="flex items-start justify-between gap-4">
                         <div className="min-w-0">
-                          <div className="text-[11px] uppercase tracking-widest text-muted-foreground">
-                            Token
-                          </div>
-                          <div className="mt-1 font-mono text-sm truncate">
-                            {l.token}
-                          </div>
-
-                          <div className="mt-2 flex flex-wrap items-center gap-2">
+                          {/* <div className="mt-2 flex flex-wrap items-center gap-2">
                             <Badge variant="secondary" className="rounded-full">
                               {scopeLabel}
                             </Badge>
@@ -426,6 +447,47 @@ export default function AdminDashboardPage() {
                                 Expirado
                               </Badge>
                             )}
+                          </div> */}
+
+                          <div className="mt-2 space-y-1">
+                            <div className="flex flex-wrap items-center gap-2">
+                              {l.service && (
+                                <div className="text-base font-semibold leading-tight truncate">
+                                  {l.service.name}
+                                </div>
+                              )}
+                              {!l.service && (
+                                <div className="text-base font-semibold leading-tight">
+                                  Link geral (todos os serviços)
+                                </div>
+                              )}
+                              {l.service ? (
+                                <Badge
+                                  variant="secondary"
+                                  className="rounded-full"
+                                >
+                                  Serviço
+                                </Badge>
+                              ) : (
+                                <Badge className="rounded-full bg-amber-500/20 text-amber-800">
+                                  Geral
+                                </Badge>
+                              )}
+
+                              <Badge
+                                variant="secondary"
+                                className={[
+                                  "rounded-full",
+                                  isActive
+                                    ? "bg-emerald-500/15 text-emerald-700"
+                                    : "bg-rose-500/15 text-rose-700",
+                                ].join(" ")}
+                              >
+                                {isActive ? "Ativo" : "Inativo"}
+                              </Badge>
+
+                              {/* ...demais badges (Sem expediente / Expirado) permanecem... */}
+                            </div>
                           </div>
                         </div>
 

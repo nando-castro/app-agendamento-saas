@@ -1,4 +1,7 @@
+import inactiveAnim from "@/assets/lotties/link-inactive.json";
+import invalidAnim from "@/assets/lotties/link-invalid.json";
 import { useLoading } from "@/lib/loading";
+import { Player } from "@lottiefiles/react-lottie-player";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { useParams } from "react-router-dom";
 import { publicApi } from "../../lib/api";
@@ -18,6 +21,7 @@ type PixPayment = {
   qrCodeBase64?: string | null; // imagem
   ticketUrl?: string | null;
 };
+type LinkScreenState = "OK" | "INVALID" | "INACTIVE";
 
 function pad2(n: number) {
   return String(n).padStart(2, "0");
@@ -65,10 +69,15 @@ export default function PublicBookingPage() {
   const pollRef = useRef<number | null>(null);
   const countdownRef = useRef<number | null>(null);
 
+  const [linkState, setLinkState] = useState<LinkScreenState>("OK");
+  const [linkMsg, setLinkMsg] = useState<string>("");
+
   async function loadServices() {
     if (!token) return;
     setErr(null);
     setLoading(true);
+    setLinkState("OK");
+    setLinkMsg("");
     show("Carregando serviços...");
 
     try {
@@ -76,11 +85,56 @@ export default function PublicBookingPage() {
       setServices(data);
       if (data[0]) setServiceId(data[0].id);
     } catch (e: any) {
-      setErr(e?.response?.data?.message ?? "Falha ao carregar serviços.");
+      const status = e?.response?.status as number | undefined;
+      const msg = (e?.response?.data?.message as string | undefined) ?? "";
+
+      // Ajuste conforme seu backend:
+      if (status === 404 || /token|inválid|inexistente/i.test(msg)) {
+        setLinkState("INVALID");
+        setLinkMsg(msg || "Esse link não existe ou expirou.");
+        return;
+      }
+
+      if (status === 403 || /inativ|desativad/i.test(msg)) {
+        setLinkState("INACTIVE");
+        setLinkMsg(msg || "Esse link está inativo no momento.");
+        return;
+      }
+
+      setErr(msg || "Falha ao carregar serviços.");
     } finally {
       hide();
       setLoading(false);
     }
+  }
+
+  function FullScreenState(props: {
+    title: string;
+    message?: string;
+    animationData: object;
+  }) {
+    return (
+      <div className="min-h-[70vh] flex flex-col items-center justify-center text-center px-4">
+        <div className="w-[260px] h-[260px]">
+          <Player
+            autoplay
+            loop
+            src={props.animationData}
+            style={{ height: "100%", width: "100%" }}
+          />
+        </div>
+
+        <div className="mt-4 text-2xl sm:text-3xl font-semibold text-zinc-900">
+          {props.title}
+        </div>
+
+        {props.message && (
+          <div className="mt-2 text-base sm:text-lg text-zinc-600 max-w-xl">
+            {props.message}
+          </div>
+        )}
+      </div>
+    );
   }
 
   async function loadAvailability(opts?: {
@@ -327,6 +381,26 @@ export default function PublicBookingPage() {
                 : "Escolha serviço, data e horário."}
             </p>
           </header>
+          {!loading && linkState === "INVALID" && (
+            <FullScreenState
+              title="Link inválido"
+              message={
+                linkMsg || "Verifique se você copiou o link corretamente."
+              }
+              animationData={invalidAnim as object}
+            />
+          )}
+
+          {!loading && linkState === "INACTIVE" && (
+            <FullScreenState
+              title="Link inativo"
+              message={
+                linkMsg ||
+                "Esse link foi desativado. Solicite um novo ao responsável."
+              }
+              animationData={inactiveAnim as object}
+            />
+          )}
 
           {err && (
             <div className="rounded-xl bg-red-50 border border-red-200 p-3 text-sm text-red-700">
@@ -334,9 +408,7 @@ export default function PublicBookingPage() {
             </div>
           )}
 
-          {loading ? (
-            <div className="text-sm text-zinc-600">Carregando...</div>
-          ) : (
+          {!loading && linkState !== "OK" ? null : (
             <>
               {/* FORMULARIO (some quando entrou no fluxo de pagamento) */}
               {!inPaymentFlow && (
