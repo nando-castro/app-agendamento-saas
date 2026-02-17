@@ -2,6 +2,9 @@ import { clearAdminToken, getAdminToken } from "@/lib/storage";
 import { useEffect, useState } from "react";
 import { Navigate, Route, Routes, useLocation } from "react-router-dom";
 
+import LandingPage from "@/pages/LandingPage";
+import SubscribePage from "@/pages/SubscribePage";
+
 import AdminBookingsPage from "@/pages/admin/AdminBookingsPage";
 import AdminDashboardPage from "@/pages/admin/AdminDashboardPage";
 import AdminLayout from "@/pages/admin/AdminLayout";
@@ -13,7 +16,7 @@ import PublicBookingPage from "@/pages/public/PublicBookingPage";
 
 import FullscreenLoader from "@/components/ui/FullscreenLoader";
 import { isJwtExpired } from "@/lib/jwt";
-import NotFoundPage from "./pages/NotFoundPage";
+import NotFoundPage from "@/pages/NotFoundPage";
 
 function AdminGuard({ children }: { children: React.ReactNode }) {
   const location = useLocation();
@@ -63,7 +66,11 @@ function AdminGuard({ children }: { children: React.ReactNode }) {
 export default function App() {
   return (
     <Routes>
-      <Route path="/" element={<Navigate to="/admin" replace />} />
+      {/* Landing (antes do login/registro) */}
+      <Route path="/" element={<LandingPage />} />
+
+      {/* Assinatura (Stripe) */}
+      <Route path="/subscribe" element={<SubscribePage />} />
 
       {/* Público */}
       <Route path="/public/:token" element={<PublicBookingPage />} />
@@ -87,10 +94,10 @@ export default function App() {
         <Route path="bookings" element={<AdminBookingsPage />} />
       </Route>
 
-      <Route path="*" element={<Navigate to="/admin" replace />} />
-
-      {/* ✅ 404 global */}
+      {/* Fallback global: escolha UMA opção */}
       <Route path="*" element={<NotFoundPage />} />
+      {/* ou se você preferir redirecionar tudo para a landing: */}
+      {/* <Route path="*" element={<Navigate to="/" replace />} /> */}
     </Routes>
   );
 }
