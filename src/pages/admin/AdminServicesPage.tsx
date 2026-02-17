@@ -311,14 +311,24 @@ export default function AdminServicesPage() {
           </p>
         </div>
 
+        {/* Mobile */}
         <Button
           onClick={openCreate}
           size="icon"
-          className="rounded-full shrink-0"
+          className="rounded-full shrink-0 sm:hidden"
           aria-label="Novo serviço"
           title="Novo serviço"
         >
           <Plus className="h-5 w-5" />
+        </Button>
+
+        {/* Desktop/Tablet */}
+        <Button
+          onClick={openCreate}
+          className="hidden sm:inline-flex rounded-xl gap-2"
+        >
+          <Plus className="h-4 w-4" />
+          Novo serviço
         </Button>
       </div>
 
