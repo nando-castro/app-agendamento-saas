@@ -12,9 +12,25 @@ import bookingService from "@/gateway/services/bookingsService";
 import { useLoading } from "@/lib/loading";
 import { Bell, CalendarDays, Filter, Phone, Search, User } from "lucide-react";
 
+import {
+  DropdownMenu,
+  DropdownMenuCheckboxItem,
+  DropdownMenuContent,
+  DropdownMenuLabel,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
+
 function money(cents: number) {
   return `R$ ${(cents / 100).toFixed(2)}`;
 }
+
+type BookingStatus =
+  | "CONFIRMED"
+  | "CANCELLED"
+  | "COMPLETED"
+  | "EXPIRED"
+  | "PENDING_PAYMENT";
 
 function statusLabel(status: string) {
   const s = String(status || "").toUpperCase();
@@ -62,6 +78,27 @@ export default function AdminBookingsPage() {
 
   const [items, setItems] = useState<Booking[]>([]);
 
+  const statusOptions: { value: BookingStatus; label: string }[] = [
+    { value: "CONFIRMED", label: "Confirmado" },
+    { value: "PENDING_PAYMENT", label: "Pendente" },
+    { value: "COMPLETED", label: "Concluído" },
+    { value: "CANCELLED", label: "Cancelado" },
+    { value: "EXPIRED", label: "Expirado" },
+  ];
+
+  const [statusFilter, setStatusFilter] = useState<Set<BookingStatus>>(
+    () => new Set(),
+  );
+
+  const filteredItems = useMemo(() => {
+    if (statusFilter.size === 0) return items; // sem filtro => tudo
+    return items.filter((b) =>
+      statusFilter.has(
+        String((b as any).status).toUpperCase() as BookingStatus,
+      ),
+    );
+  }, [items, statusFilter]);
+
   async function load(label = "Carregando agendamentos...") {
     setErr(null);
     setLoading(true);
@@ -88,8 +125,8 @@ export default function AdminBookingsPage() {
 
   const resultsLabel = useMemo(() => {
     if (loading) return "Carregando...";
-    return `RESULTADOS (${items.length})`;
-  }, [loading, items.length]);
+    return `RESULTADOS (${filteredItems.length})`;
+  }, [loading, filteredItems.length]);
 
   return (
     <div className="w-full space-y-4">
@@ -183,20 +220,56 @@ export default function AdminBookingsPage() {
           {resultsLabel}
         </div>
 
-        <Button
-          variant="ghost"
-          size="sm"
-          className="gap-2 text-muted-foreground"
-          onClick={() => {}}
-        >
-          Filtrar
-          <Filter className="h-4 w-4" />
-        </Button>
+        <DropdownMenu>
+          <DropdownMenuTrigger asChild>
+            <Button
+              variant="ghost"
+              size="sm"
+              className="gap-2 text-muted-foreground"
+            >
+              Filtrar
+              <Filter className="h-4 w-4" />
+            </Button>
+          </DropdownMenuTrigger>
+
+          <DropdownMenuContent align="end" className="w-56">
+            <DropdownMenuLabel>Status</DropdownMenuLabel>
+            <DropdownMenuSeparator />
+
+            {statusOptions.map((opt) => (
+              <DropdownMenuCheckboxItem
+                key={opt.value}
+                checked={statusFilter.has(opt.value)}
+                onCheckedChange={(checked) => {
+                  setStatusFilter((prev) => {
+                    const next = new Set(prev);
+                    if (checked) next.add(opt.value);
+                    else next.delete(opt.value);
+                    return next;
+                  });
+                }}
+                onSelect={(e) => e.preventDefault()} // evita fechar ao clicar no item
+              >
+                {opt.label}
+              </DropdownMenuCheckboxItem>
+            ))}
+
+            <DropdownMenuSeparator />
+
+            <Button
+              variant="ghost"
+              className="w-full justify-start"
+              onClick={() => setStatusFilter(new Set())}
+            >
+              Limpar filtros
+            </Button>
+          </DropdownMenuContent>
+        </DropdownMenu>
       </div>
 
       {/* Lista */}
       <div className="space-y-3">
-        {items.map((b) => {
+        {filteredItems.map((b) => {
           const st = statusLabel(String((b as any).status));
           const serviceName = b.service?.name ?? "Serviço";
           const customerName = b.customer?.name ?? "Cliente";
@@ -272,7 +345,7 @@ export default function AdminBookingsPage() {
           );
         })}
 
-        {!loading && items.length === 0 && (
+        {!loading && filteredItems.length === 0 && (
           <div className="text-sm text-muted-foreground">
             Nenhum agendamento no período.
           </div>
