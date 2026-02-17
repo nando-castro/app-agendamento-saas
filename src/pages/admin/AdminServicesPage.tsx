@@ -14,12 +14,20 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
+import {
+  DropdownMenu,
+  DropdownMenuCheckboxItem,
+  DropdownMenuContent,
+  DropdownMenuLabel,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 
 import { Checkbox } from "@/components/ui/checkbox";
 import { useLoading } from "@/lib/loading";
-import { Pencil, Plus, Power, SlidersHorizontal, X } from "lucide-react";
+import { Pencil, Plus, Power, SlidersHorizontal } from "lucide-react";
 
 const SCHEDULE_ROUTE = "/admin/schedule"; // <- ajuste se necessário
 
@@ -121,7 +129,7 @@ const durationPresets = [
   { label: "3 horas", minutes: 180 },
 ];
 
-type Filter = "all" | "active" | "inactive";
+type ServiceFilterKey = "active" | "inactive";
 
 export default function AdminServicesPage() {
   const nav = useNavigate();
@@ -138,8 +146,13 @@ export default function AdminServicesPage() {
   const [editing, setEditing] = useState<Service | null>(null);
   const [form, setForm] = useState<ServiceForm>(emptyForm);
 
-  const [filterOpen, setFilterOpen] = useState(false);
-  const [filter, setFilter] = useState<Filter>("all");
+  // const [filterOpen, setFilterOpen] = useState(false);
+  // const [filter, setFilter] = useState<Filter>("all");
+
+
+  const [serviceFilter, setServiceFilter] = useState<Set<ServiceFilterKey>>(
+    () => new Set(["active", "inactive"]), // padrão: mostra tudo
+  );
 
   const title = useMemo(
     () => (editing ? "Editar serviço" : "Novo serviço"),
@@ -296,10 +309,12 @@ export default function AdminServicesPage() {
   );
 
   const filteredItems = useMemo(() => {
-    if (filter === "active") return items.filter((i) => !!i.active);
-    if (filter === "inactive") return items.filter((i) => !i.active);
-    return items;
-  }, [items, filter]);
+    // Se o usuário desmarcar tudo, mostra nada (intencional)
+    return items.filter((s) => {
+      if (s.active) return serviceFilter.has("active");
+      return serviceFilter.has("inactive");
+    });
+  }, [items, serviceFilter]);
 
   return (
     <div className="w-full space-y-4">
@@ -337,15 +352,59 @@ export default function AdminServicesPage() {
           {loading ? "Carregando..." : `${activeCount} serviço(s) ativo(s)`}
         </div>
 
-        <Button
-          variant="ghost"
-          size="sm"
-          className="gap-2"
-          onClick={() => setFilterOpen(true)}
-        >
-          <SlidersHorizontal className="h-4 w-4" />
-          Filtrar
-        </Button>
+        <DropdownMenu>
+          <DropdownMenuTrigger asChild>
+            <Button variant="ghost" size="sm" className="gap-2">
+              <SlidersHorizontal className="h-4 w-4" />
+              Filtrar
+            </Button>
+          </DropdownMenuTrigger>
+
+          <DropdownMenuContent align="end" className="w-56">
+            <DropdownMenuLabel>Status do serviço</DropdownMenuLabel>
+            <DropdownMenuSeparator />
+
+            <DropdownMenuCheckboxItem
+              checked={serviceFilter.has("active")}
+              onCheckedChange={(checked) => {
+                setServiceFilter((prev) => {
+                  const next = new Set(prev);
+                  if (checked) next.add("active");
+                  else next.delete("active");
+                  return next;
+                });
+              }}
+              onSelect={(e) => e.preventDefault()}
+            >
+              Ativos
+            </DropdownMenuCheckboxItem>
+
+            <DropdownMenuCheckboxItem
+              checked={serviceFilter.has("inactive")}
+              onCheckedChange={(checked) => {
+                setServiceFilter((prev) => {
+                  const next = new Set(prev);
+                  if (checked) next.add("inactive");
+                  else next.delete("inactive");
+                  return next;
+                });
+              }}
+              onSelect={(e) => e.preventDefault()}
+            >
+              Inativos
+            </DropdownMenuCheckboxItem>
+
+            <DropdownMenuSeparator />
+
+            <Button
+              variant="ghost"
+              className="w-full justify-start"
+              onClick={() => setServiceFilter(new Set(["active", "inactive"]))}
+            >
+              Limpar filtro
+            </Button>
+          </DropdownMenuContent>
+        </DropdownMenu>
       </div>
 
       {/* ✅ aviso quando horários não estão prontos */}
@@ -466,7 +525,7 @@ export default function AdminServicesPage() {
       </div>
 
       {/* Dialog filtro */}
-      <Dialog open={filterOpen} onOpenChange={setFilterOpen}>
+      {/* <Dialog open={filterOpen} onOpenChange={setFilterOpen}>
         <DialogContent className="sm:max-w-md">
           <DialogHeader>
             <DialogTitle>Filtrar</DialogTitle>
@@ -511,7 +570,7 @@ export default function AdminServicesPage() {
             </Button>
           </DialogFooter>
         </DialogContent>
-      </Dialog>
+      </Dialog> */}
 
       {/* Dialog criar/editar */}
       <Dialog open={open} onOpenChange={setOpen}>
