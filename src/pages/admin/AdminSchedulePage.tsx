@@ -385,27 +385,39 @@ export default function AdminSchedulePage() {
       {/* TOP BAR */}
       <div className="sticky top-0 z-30 -mx-4 px-4 py-3 border-b bg-background/95 backdrop-blur md:static md:mx-0 md:px-0 md:border-0">
         <div className="flex items-center justify-between gap-3">
-          <Button
-            variant="ghost"
-            size="sm"
-            className="gap-2"
-            onClick={() => nav(-1)}
-          >
-            <ArrowLeft className="h-4 w-4" />
-            <span className="hidden sm:inline">Voltar</span>
-          </Button>
+          <div className="grid w-full grid-cols-3 items-center gap-3">
+            {/* ESQUERDA */}
+            <div className="flex justify-start">
+              <Button
+                variant="ghost"
+                size="sm"
+                className="gap-2 hidden md:inline-flex"
+                onClick={() => nav(-1)}
+              >
+                <ArrowLeft className="h-4 w-4" />
+                <span className="hidden sm:inline">Voltar</span>
+              </Button>
+            </div>
 
-          <div className="min-w-0 text-center">
-            <div className="font-semibold leading-none">Horários</div>
-            <div className="text-xs text-muted-foreground">
-              {loading ? "Carregando..." : "Expediente e bloqueios"}
+            {/* CENTRO */}
+            <div className="min-w-0 text-center">
+              <div className="font-semibold leading-none">Horários</div>
+              <div className="text-xs text-muted-foreground">
+                {loading ? "Carregando..." : "Expediente e bloqueios"}
+              </div>
+            </div>
+
+            {/* DIREITA */}
+            <div className="flex justify-end">
+              <Button
+                size="sm"
+                className="rounded-full hidden md:inline-flex"
+                onClick={openHoursEditor}
+              >
+                {hoursConfigured ? "Editar" : "Configurar"}
+              </Button>
             </div>
           </div>
-
-          {/* ✅ primeira vez: Configurar | depois: Editar */}
-          <Button size="sm" className="rounded-full" onClick={openHoursEditor}>
-            {hoursConfigured ? "Editar" : "Configurar"}
-          </Button>
         </div>
       </div>
 
@@ -519,14 +531,21 @@ export default function AdminSchedulePage() {
             </p>
           </div>
 
+          {/* Mobile */}
           <Button
             size="icon"
-            className="rounded-full"
+            className="rounded-full shrink-0 sm:hidden"
             onClick={() => setOpenBlock(true)}
             aria-label="Novo bloqueio"
             title="Novo bloqueio"
           >
             <Plus className="h-5 w-5" />
+          </Button>
+
+          {/* Desktop/Tablet */}
+          <Button className="hidden sm:inline-flex rounded-xl gap-2">
+            <Plus className="h-4 w-4" />
+            Novo bloqueio
           </Button>
         </div>
 
@@ -739,7 +758,10 @@ export default function AdminSchedulePage() {
           if (!v) setErr(null);
         }}
       >
-        <DialogContent>
+        <DialogContent
+          onPointerDownOutside={(e) => e.preventDefault()}
+          onInteractOutside={(e) => e.preventDefault()}
+        >
           <DialogHeader>
             <DialogTitle>Novo bloqueio</DialogTitle>
           </DialogHeader>
