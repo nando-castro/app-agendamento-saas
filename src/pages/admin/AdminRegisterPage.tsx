@@ -288,8 +288,8 @@ export default function AdminRegisterPage() {
   }, [normalized.tenantName, slugDirty]);
 
   return (
-    <div className="min-h-screen grid place-items-center p-4">
-      <div className="w-full max-w-md rounded-2xl bg-white shadow p-6">
+    <div className="h-dvh overflow-y-auto p-4 sm:min-h-screen sm:grid sm:place-items-center sm:overflow-visible">
+    <div className="w-full max-w-md rounded-2xl bg-white shadow p-6">
         <h1 className="text-xl font-semibold">Criar conta</h1>
 
         <form onSubmit={onSubmit} className="mt-4 space-y-3" noValidate>
